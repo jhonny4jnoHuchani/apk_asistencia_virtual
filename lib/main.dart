@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/auth_provider.dart';
 import 'providers/horario_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/cambio_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/registro_facial_screen.dart';
+import 'screens/guia_demo_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -87,12 +89,26 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  void _navegarSegunEstado(AuthProvider authProvider) {
+  Future<void> _navegarSegunEstado(AuthProvider authProvider) async {
     if (authProvider.necesitaCambiarPassword) {
       _irA(const CambioPasswordScreen());
-    } else if (authProvider.necesitaRegistroFacial) {
+      return;
+    }
+
+    if (authProvider.necesitaRegistroFacial) {
       _irA(const RegistroFacialScreen());
+      return;
+    }
+
+    // Verificar si ya vio el tutorial
+    final prefs = await SharedPreferences.getInstance();
+    final yaVioTutorial = prefs.getBool('ya_vio_tutorial') ?? false;
+
+    if (!yaVioTutorial) {
+      // Primera vez → mostrar guía demo
+      _irA(const GuiaDemoScreen());
     } else {
+      // Ya sabe usar la app → ir directo al Home
       _irA(const HomeScreen());
     }
   }

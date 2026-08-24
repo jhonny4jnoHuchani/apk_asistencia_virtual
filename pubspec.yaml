@@ -23,6 +23,7 @@ dependencies:
   device_info_plus: ^10.0.0
   local_auth: ^2.2.0
   flutter_tts: ^4.2.5
+  tutorial_coach_mark: ^1.2.11
 
 dev_dependencies:
   flutter_test:
