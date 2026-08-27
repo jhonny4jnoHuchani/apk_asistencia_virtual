@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:intl/intl.dart';
+import 'package:image/image.dart' as img;
+import 'package:path_provider/path_provider.dart';
 import 'guia_demo_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/horario_provider.dart';
@@ -11,6 +14,13 @@ import '../services/marcado_service.dart';
 import '../services/biometric_service.dart';
 import '../widgets/horario_card.dart';
 import '../widgets/loading_indicator.dart';
+import '../widgets/home/home_app_bar.dart';
+import '../widgets/home/horario_list_view.dart';
+import '../widgets/home/empty_state.dart';
+import '../widgets/home/error_state.dart';
+import '../widgets/home/camera_marcado_screen.dart';
+import '../widgets/common/custom_snackbar.dart';
+import '../widgets/common/loading_dialog.dart';
 import 'login_screen.dart';
 import 'historial_screen.dart';
 import 'perfil_screen.dart';
@@ -26,25 +36,68 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final MarcadoService _marcadoService = MarcadoService();
   final BiometricService _biometricService = BiometricService();
+
+  // Estado de la cámara
   CameraController? _cameraController;
   bool _mostrarCamara = false;
+
+  // Estado del marcado
   String? _tipoMarcado;
   int? _horarioIdSeleccionado;
-
-  // NUEVO: Para las 3 fotos + gesto
-  String? _etapaFoto; // 'frontal', 'gesto' o 'constancia'
+  String? _etapaFoto;
   File? _fotoFrontal;
   File? _fotoGesto;
   File? _fotoConstancia;
   String? _gestoSolicitado;
   Position? _posicionGPS;
 
+  // Nuevos estados
+  bool _isProcessing = false;
+  String? _currentDate;
+  String _userName = 'Docente';
+  String _userRole = 'docente';
+
+  // Constantes de diseño
+  static const Color _primaryColor = Color(0xFF5B67CA);
+  static const Color _secondaryColor = Color(0xFF8B95E0);
+  static const Color _backgroundColor = Color(0xFFF8F9FC);
+  static const Color _textPrimary = Color(0xFF2D3436);
+  static const Color _textSecondary = Color(0xFF636E72);
+  static const Color _successColor = Color(0xFF00B894);
+  static const Color _warningColor = Color(0xFFFDCB6E);
+  static const Color _dangerColor = Color(0xFFE17055);
+  static const Color _infoColor = Color(0xFF74B9FF);
+
   @override
   void initState() {
     super.initState();
+    _loadUserData();
+    _loadCurrentDate();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HorarioProvider>().cargarHorarios();
     });
+  }
+
+  void _loadUserData() {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.user;
+
+    if (user != null) {
+      _userName =
+          user.nombreCompleto.isNotEmpty ? user.nombreCompleto : 'Docente';
+
+      _userRole = user.rol.isNotEmpty
+          ? user.rol[0].toUpperCase() + user.rol.substring(1)
+          : 'Docente';
+    } else {
+      _userName = 'Docente';
+      _userRole = 'Docente';
+    }
+  }
+
+  void _loadCurrentDate() {
+    final now = DateTime.now();
+    _currentDate = DateFormat('EEEE, dd MMMM yyyy', 'es').format(now);
   }
 
   @override
@@ -56,12 +109,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<bool> _solicitarPermisos() async {
     final cameraStatus = await Permission.camera.request();
     if (!cameraStatus.isGranted) {
-      _mostrarError('Se necesita permiso de cámara');
+      CustomSnackbar.showError(context, 'Se necesita permiso de cámara');
       return false;
     }
     final locationStatus = await Permission.location.request();
     if (!locationStatus.isGranted) {
-      _mostrarError('Se necesita permiso de ubicación');
+      CustomSnackbar.showError(context, 'Se necesita permiso de ubicación');
       return false;
     }
     return true;
@@ -71,64 +124,84 @@ class _HomeScreenState extends State<HomeScreen> {
   // FLUJO DE MARCADO
   // ============================================
   Future<void> _iniciarMarcado(String tipo, int horarioId) async {
+    if (_isProcessing) return;
+
     final biometricOk = await _biometricService.authenticate();
     if (!biometricOk) {
-      final continuar = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Biometría no disponible'),
-          content: const Text('¿Desea continuar sin autenticación biométrica?'),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancelar')),
-            ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Continuar')),
-          ],
-        ),
-      );
+      final continuar = await _showBiometricDialog();
       if (continuar != true) return;
     }
 
     final permisosOk = await _solicitarPermisos();
     if (!permisosOk) return;
 
-    // Obtener GPS ANTES de las fotos
     try {
       _posicionGPS = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
     } catch (e) {
-      _mostrarError('No se pudo obtener la ubicación GPS');
+      CustomSnackbar.showError(context, 'No se pudo obtener la ubicación GPS');
       return;
     }
 
-    _tipoMarcado = tipo;
-    _horarioIdSeleccionado = horarioId;
-    _fotoFrontal = null;
-    _fotoGesto = null;
-    _fotoConstancia = null;
+    setState(() {
+      _tipoMarcado = tipo;
+      _horarioIdSeleccionado = horarioId;
+      _fotoFrontal = null;
+      _fotoGesto = null;
+      _fotoConstancia = null;
+      _isProcessing = true;
+    });
 
-    // Generar gesto aleatorio
     _gestoSolicitado = _generarGestoAleatorio();
-    _mostrarInfo(_instruccionGesto(_gestoSolicitado!));
+    CustomSnackbar.showInfo(context, _instruccionGesto(_gestoSolicitado!));
 
-    // Empezar con foto FRONTAL
     _etapaFoto = 'frontal';
     await _abrirCamara();
   }
 
-
-
-
-
+  Future<bool?> _showBiometricDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.fingerprint_rounded, color: _primaryColor, size: 28),
+            const SizedBox(width: 12),
+            const Text('Biometría no disponible'),
+          ],
+        ),
+        content: const Text('¿Desea continuar sin autenticación biométrica?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _abrirCamara() async {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        _mostrarError('No se encontró cámara en el dispositivo');
+        CustomSnackbar.showError(
+            context, 'No se encontró cámara en el dispositivo');
         return;
       }
 
@@ -147,19 +220,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
       _cameraController = CameraController(
         camaraSeleccionada,
-        ResolutionPreset.medium,
+        ResolutionPreset.high,
         enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
       await _cameraController!.initialize();
-      setState(() => _mostrarCamara = true);
+
+      if (mounted) {
+        setState(() => _mostrarCamara = true);
+      }
     } catch (e) {
-      _mostrarError('Error al abrir la cámara');
+      CustomSnackbar.showError(context, 'Error al abrir la cámara');
     }
   }
-
-
-
 
   Future<void> _capturarYMarcar() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized)
@@ -168,37 +242,25 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final XFile photo = await _cameraController!.takePicture();
 
-      // FRONTAL
       if (_etapaFoto == 'frontal') {
-        _fotoFrontal = File(photo.path);
-        await _cameraController?.dispose();
-        setState(() {
-          _mostrarCamara = false;
-          _cameraController = null;
-          _etapaFoto = 'gesto';
-        });
-        _mostrarInfo(_instruccionGesto(_gestoSolicitado!));
-        await _abrirCamara();
+        // Recortar la foto a formato 3x4
+        final croppedFile = await _cropTo3x4(File(photo.path));
+        _fotoFrontal = croppedFile;
+        await _switchToNextStage('gesto', _instruccionGesto(_gestoSolicitado!));
         return;
       }
 
-      // GESTO
       if (_etapaFoto == 'gesto') {
-        _fotoGesto = File(photo.path);
-        await _cameraController?.dispose();
-        setState(() {
-          _mostrarCamara = false;
-          _cameraController = null;
-          _etapaFoto = 'constancia';
-        });
-        _mostrarInfo('Ahora toma la foto de constancia (opcional)');
-        await _abrirCamara();
+        // Recortar la foto a formato 3x4
+        final croppedFile = await _cropTo3x4(File(photo.path));
+        _fotoGesto = croppedFile;
+        await _switchToNextStage(
+            'constancia', 'Ahora toma la foto de constancia (opcional)');
         return;
       }
 
-      // CONSTANCIA
+      // CONSTANCIA (sin recorte)
       _fotoConstancia = File(photo.path);
-
       await _cameraController?.dispose();
       setState(() {
         _mostrarCamara = false;
@@ -208,22 +270,27 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       await _enviarMarcado();
     } catch (e) {
-      _mostrarError('Error al capturar foto');
+      CustomSnackbar.showError(context, 'Error al capturar foto');
     }
   }
 
-
-
+  Future<void> _switchToNextStage(String nextStage, String message) async {
+    await _cameraController?.dispose();
+    setState(() {
+      _mostrarCamara = false;
+      _cameraController = null;
+      _etapaFoto = nextStage;
+    });
+    CustomSnackbar.showInfo(context, message);
+    await _abrirCamara();
+  }
 
   Future<void> _enviarMarcado() async {
     final horarioProvider = context.read<HorarioProvider>();
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
 
+    LoadingDialog.show(context, 'Procesando marcado...');
+
+    try {
       if (_tipoMarcado == 'entrada') {
         await _marcadoService.marcarEntrada(
           horarioId: _horarioIdSeleccionado!,
@@ -248,23 +315,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (mounted) Navigator.of(context).pop();
 
-      _mostrarExito(
+      CustomSnackbar.showSuccess(
+        context,
         _tipoMarcado == 'entrada'
             ? 'Entrada marcada correctamente'
             : 'Salida marcada correctamente',
       );
 
       if (mounted) {
+        setState(() => _isProcessing = false);
         horarioProvider.refrescarTodo();
       }
     } catch (e) {
-      if (mounted) Navigator.of(context).pop();
-      _mostrarError(e.toString().replaceAll('Exception: ', ''));
+      if (mounted) {
+        Navigator.of(context).pop();
+        setState(() => _isProcessing = false);
+      }
+      CustomSnackbar.showError(
+        context,
+        e.toString().replaceAll('Exception: ', ''),
+      );
     }
   }
-
-
-
 
   Future<void> _cancelarCamara() async {
     await _cameraController?.dispose();
@@ -279,40 +351,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _fotoConstancia = null;
       _gestoSolicitado = null;
       _posicionGPS = null;
+      _isProcessing = false;
     });
   }
 
-  void _mostrarError(String mensaje) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(mensaje),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating),
-    );
-  }
-
-  void _mostrarExito(String mensaje) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(mensaje),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating),
-    );
-  }
-
-  void _mostrarInfo(String mensaje) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(mensaje),
-          backgroundColor: Colors.blue,
-          behavior: SnackBarBehavior.floating),
-    );
-  }
-
-    String _generarGestoAleatorio() {
+  String _generarGestoAleatorio() {
     final gestos = ['arriba', 'abajo', 'izquierda', 'derecha', 'sonrisa'];
     final random = DateTime.now().millisecondsSinceEpoch % gestos.length;
     return gestos[random];
@@ -339,15 +382,33 @@ class _HomeScreenState extends State<HomeScreen> {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cerrar sesión'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.logout_rounded, color: _dangerColor, size: 28),
+            const SizedBox(width: 12),
+            const Text('Cerrar sesión'),
+          ],
+        ),
         content: const Text('¿Estás seguro de cerrar sesión?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar')),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Cerrar sesión')),
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _dangerColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Cerrar sesión'),
+          ),
         ],
       ),
     );
@@ -365,181 +426,256 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     if (_mostrarCamara && _cameraController != null) {
-      return _buildCamaraScreen();
+      return CameraMarcadoScreen(
+        cameraController: _cameraController!,
+        etapaFoto: _etapaFoto ?? 'frontal',
+        gestoSolicitado: _gestoSolicitado,
+        instruccionGesto: _instruccionGesto,
+        onCapture: _capturarYMarcar,
+        onCancel: _cancelarCamara,
+      );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mis Horarios'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            tooltip: 'Ver guía de uso',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const GuiaDemoScreen()),
-            ),
-          ),
-          IconButton(
-              icon: const Icon(Icons.face),
-              tooltip: 'Registro Facial',
-              onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const RegistroFacialScreen()))),
-          IconButton(
-              icon: const Icon(Icons.history),
-              tooltip: 'Historial',
-              onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const HistorialScreen()))),
-          IconButton(
-              icon: const Icon(Icons.person),
-              tooltip: 'Perfil',
-              onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const PerfilScreen()))),
-          IconButton(
-              icon: const Icon(Icons.logout),
-              tooltip: 'Cerrar sesión',
-              onPressed: _cerrarSesion),
-        ],
+      backgroundColor: _backgroundColor,
+      appBar: HomeAppBar(
+        onHelp: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const GuiaDemoScreen()),
+        ),
+        onRegistroFacial: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RegistroFacialScreen()),
+        ),
+        onHistorial: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const HistorialScreen()),
+        ),
+        onPerfil: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PerfilScreen()),
+        ),
+        onLogout: _cerrarSesion,
       ),
-      body: Consumer<HorarioProvider>(
-        builder: (context, horarioProvider, _) {
-          if (horarioProvider.isLoading) {
-            return const LoadingIndicator(mensaje: 'Cargando horarios...');
-          }
-          if (horarioProvider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 60, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(horarioProvider.error!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.red)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                      onPressed: () => horarioProvider.cargarHorarios(),
-                      child: const Text('Reintentar')),
-                ],
-              ),
-            );
-          }
-          if (horarioProvider.horarios.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.event_busy, size: 80, color: Colors.grey.shade400),
-                  const SizedBox(height: 16),
-                  const Text('No tienes horarios para hoy',
-                      style: TextStyle(fontSize: 18, color: Colors.grey)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                      onPressed: () => horarioProvider.cargarHorarios(),
-                      child: const Text('Refrescar')),
-                ],
-              ),
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () => horarioProvider.refrescarTodo(),
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: horarioProvider.horarios.length,
-              itemBuilder: (context, index) {
-                final horario = horarioProvider.horarios[index];
-                return HorarioCard(
-                  horario: horario,
-                  onMarcarEntrada: () => _iniciarMarcado('entrada', horario.id),
-                  onMarcarSalida: () => _iniciarMarcado('salida', horario.id),
+      body: Column(
+        children: [
+          _buildWelcomeSection(),
+          Expanded(
+            child: Consumer<HorarioProvider>(
+              builder: (context, horarioProvider, _) {
+                if (horarioProvider.isLoading) {
+                  return const LoadingIndicator(
+                      mensaje: 'Cargando horarios...');
+                }
+                if (horarioProvider.error != null) {
+                  return ErrorState(
+                    error: horarioProvider.error!,
+                    onRetry: horarioProvider.cargarHorarios,
+                  );
+                }
+                if (horarioProvider.horarios.isEmpty) {
+                  return EmptyState(
+                    onRefresh: horarioProvider.cargarHorarios,
+                  );
+                }
+                return HorarioListView(
+                  horarios: horarioProvider.horarios,
+                  onRefresh: horarioProvider.refrescarTodo,
+                  onMarcarEntrada: (horarioId) =>
+                      _iniciarMarcado('entrada', horarioId),
+                  onMarcarSalida: (horarioId) =>
+                      _iniciarMarcado('salida', horarioId),
                 );
               },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCamaraScreen() {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            CameraPreview(_cameraController!),
-
-            // Overlay óvalo SOLO para foto de rostro
-            if (_etapaFoto == 'frontal' || _etapaFoto == 'gesto')
-              Center(
-                child: Container(
-                  width: 280,
-                  height: 350,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(140),
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                ),
-              ),
-
-            // Texto informativo
-            Positioned(
-              top: 20,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                color: Colors.black54,
-                child: Text(
-
-                  _etapaFoto == 'frontal'
-                      ? '📸 Foto FRONTAL (mire al frente)'
-                      : _etapaFoto == 'gesto'
-                          ? '📸 Foto del GESTO (${_instruccionGesto(_gestoSolicitado!)})'
-                          : '📸 Foto de CONSTANCIA (entorno)',
-
-
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-
-            // Botones
-            Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  FloatingActionButton(
-                    heroTag: 'cancel',
-                    backgroundColor: Colors.red,
-                    onPressed: _cancelarCamara,
-                    child: const Icon(Icons.close),
-                  ),
-                  FloatingActionButton(
-                    heroTag: 'capture',
-                    backgroundColor: Colors.white,
-                    onPressed: _capturarYMarcar,
-                    child:
-                        const Icon(Icons.camera, color: Colors.black, size: 32),
-                  ),
-                  const SizedBox(width: 56),
-                ],
-              ),
-            ),
-          ],
+  Widget _buildWelcomeSection() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 25,
+                backgroundColor: _primaryColor.withOpacity(0.1),
+                child: Text(
+                  _userName.isNotEmpty ? _userName[0].toUpperCase() : 'D',
+                  style: TextStyle(
+                    color: _primaryColor,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bienvenido,',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _textSecondary,
+                      ),
+                    ),
+                    Text(
+                      _userName,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: _textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _userRole,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _primaryColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_primaryColor, _secondaryColor],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Hoy',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_currentDate != null)
+            Row(
+              children: [
+                Icon(
+                  Icons.today_rounded,
+                  size: 14,
+                  color: _textSecondary.withOpacity(0.7),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _currentDate!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
     );
+  }
+
+  // Método para recortar la imagen a formato 3x4
+  Future<File> _cropTo3x4(File originalFile) async {
+    try {
+      // Leer la imagen
+      final bytes = await originalFile.readAsBytes();
+      final image = img.decodeImage(bytes);
+
+      if (image == null) return originalFile;
+
+      // Calcular dimensiones para recorte 3x4
+      final originalWidth = image.width;
+      final originalHeight = image.height;
+
+      // Relación 3:4 (ancho:alto) = 0.75
+      final targetRatio = 0.75;
+
+      int cropWidth, cropHeight, offsetX, offsetY;
+
+      if (originalWidth / originalHeight > targetRatio) {
+        // La imagen es más ancha de lo necesario
+        cropHeight = originalHeight;
+        cropWidth = (originalHeight * targetRatio).round();
+        offsetX = ((originalWidth - cropWidth) / 2).round();
+        offsetY = 0;
+      } else {
+        // La imagen es más alta de lo necesario
+        cropWidth = originalWidth;
+        cropHeight = (originalWidth / targetRatio).round();
+        offsetX = 0;
+        offsetY = ((originalHeight - cropHeight) / 2).round();
+      }
+
+      // Recortar la imagen
+      final croppedImage = img.copyCrop(
+        image,
+        x: offsetX,
+        y: offsetY,
+        width: cropWidth,
+        height: cropHeight,
+      );
+
+      // Guardar la imagen recortada
+      final tempDir = await getTemporaryDirectory();
+      final croppedPath =
+          '${tempDir.path}/cropped_3x4_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final croppedFile = File(croppedPath);
+      await croppedFile.writeAsBytes(img.encodeJpg(croppedImage, quality: 95));
+
+      // Eliminar el archivo original para ahorrar espacio
+      await originalFile.delete();
+
+      return croppedFile;
+    } catch (e) {
+      print('Error al recortar imagen: $e');
+      return originalFile;
+    }
   }
 }

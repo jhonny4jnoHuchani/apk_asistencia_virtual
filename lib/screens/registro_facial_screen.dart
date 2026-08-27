@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
 import '../providers/auth_provider.dart';
 import '../services/reconocimiento_service.dart';
 import '../widgets/wave_loading_indicator.dart';
@@ -48,48 +49,65 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
   int _intentosFallidos = 0;
   final int _maxIntentosFallidos = 3;
 
+  // Constantes de diseño
+  static const Color _primaryColor = Color(0xFF5B67CA);
+  static const Color _secondaryColor = Color(0xFF8B95E0);
+  static const Color _backgroundColor = Color(0xFFF8F9FC);
+  static const Color _textPrimary = Color(0xFF2D3436);
+  static const Color _textSecondary = Color(0xFF636E72);
+  static const Color _successColor = Color(0xFF00B894);
+  static const Color _warningColor = Color(0xFFFDCB6E);
+  static const Color _dangerColor = Color(0xFFE17055);
+  static const Color _infoColor = Color(0xFF74B9FF);
+
   final List<Map<String, dynamic>> _posiciones = [
     {
       'nombre': 'centro',
       'descripcion': 'Mira directo a la cámara',
-      'icono': Icons.center_focus_strong,
+      'icono': Icons.center_focus_strong_rounded,
       'instruccion': 'Frente a la cámara',
       'total': 10,
+      'color': Color(0xFF5B67CA),
     },
     {
       'nombre': 'izquierda',
       'descripcion': 'Gira SUAVEMENTE a la izquierda',
-      'icono': Icons.arrow_back,
+      'icono': Icons.arrow_back_rounded,
       'instruccion': 'Perfil izquierdo suave',
       'total': 14,
+      'color': Color(0xFF74B9FF),
     },
     {
       'nombre': 'derecha',
       'descripcion': 'Gira SUAVEMENTE a la derecha',
-      'icono': Icons.arrow_forward,
+      'icono': Icons.arrow_forward_rounded,
       'instruccion': 'Perfil derecho suave',
       'total': 14,
+      'color': Color(0xFF00B894),
     },
     {
       'nombre': 'arriba',
       'descripcion': 'Inclina SUAVEMENTE hacia arriba',
-      'icono': Icons.arrow_upward,
+      'icono': Icons.arrow_upward_rounded,
       'instruccion': 'Mirando arriba suavemente',
       'total': 14,
+      'color': Color(0xFFFDCB6E),
     },
     {
       'nombre': 'abajo',
       'descripcion': 'Inclina SUAVEMENTE hacia abajo',
-      'icono': Icons.arrow_downward,
+      'icono': Icons.arrow_downward_rounded,
       'instruccion': 'Mirando abajo suavemente',
       'total': 14,
+      'color': Color(0xFFE17055),
     },
     {
       'nombre': 'sonrisa',
       'descripcion': 'Sonríe naturalmente',
-      'icono': Icons.emoji_emotions,
+      'icono': Icons.emoji_emotions_rounded,
       'instruccion': 'Sonrisa natural',
       'total': 10,
+      'color': Color(0xFFA29BFE),
     },
   ];
 
@@ -205,7 +223,7 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
 
       _cameraController = CameraController(
         frontal,
-        ResolutionPreset.medium,
+        ResolutionPreset.high, // Cambiado a high para mejor calidad
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -301,18 +319,16 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
       final photo = await _cameraController!.takePicture();
       final posicion = _posiciones[_posicionActual]['nombre']!;
 
-      final tempDir = await getTemporaryDirectory();
-      final tempPath =
-          '${tempDir.path}/temp_registro_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final tempFile = File(tempPath);
-      await File(photo.path).copy(tempPath);
+      // Procesar la imagen: recortar a 3x4 y optimizar
+      final processedFile = await _procesarImagen(File(photo.path));
 
       final response = await _reconocimientoService.registrarEmbedding(
         posicion: posicion,
-        image: tempFile,
+        image: processedFile,
       );
 
-      await tempFile.delete();
+      // Limpiar archivo temporal
+      await processedFile.delete();
 
       if (!mounted) return;
 
@@ -359,6 +375,100 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
     }
   }
 
+  // Nuevo método para procesar la imagen
+  Future<File> _procesarImagen(File originalFile) async {
+    try {
+      // Leer la imagen
+      final bytes = await originalFile.readAsBytes();
+      final image = img.decodeImage(bytes);
+
+      if (image == null) {
+        // Si no se puede procesar, devolver el original
+        final tempDir = await getTemporaryDirectory();
+        final tempPath =
+            '${tempDir.path}/temp_registro_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final tempFile = File(tempPath);
+        await originalFile.copy(tempPath);
+        await originalFile.delete();
+        return tempFile;
+      }
+
+      // 1. Recortar a formato 3x4 (relación de aspecto 0.75)
+      final originalWidth = image.width;
+      final originalHeight = image.height;
+      final targetRatio = 0.75; // 3/4
+
+      int cropWidth, cropHeight, offsetX, offsetY;
+
+      if (originalWidth / originalHeight > targetRatio) {
+        // La imagen es más ancha de lo necesario
+        cropHeight = originalHeight;
+        cropWidth = (originalHeight * targetRatio).round();
+        offsetX = ((originalWidth - cropWidth) / 2).round();
+        offsetY = 0;
+      } else {
+        // La imagen es más alta de lo necesario
+        cropWidth = originalWidth;
+        cropHeight = (originalWidth / targetRatio).round();
+        offsetX = 0;
+        offsetY = ((originalHeight - cropHeight) / 2).round();
+      }
+
+      // Recortar la imagen
+      final croppedImage = img.copyCrop(
+        image,
+        x: offsetX,
+        y: offsetY,
+        width: cropWidth,
+        height: cropHeight,
+      );
+
+      // 2. Redimensionar para optimizar (máximo 800px de ancho)
+      final int maxWidth = 800;
+      img.Image resizedImage = croppedImage;
+
+      if (croppedImage.width > maxWidth) {
+        resizedImage = img.copyResize(
+          croppedImage,
+          width: maxWidth,
+          height: (maxWidth / targetRatio).round(),
+        );
+      }
+
+      // 3. Guardar la imagen procesada
+      final tempDir = await getTemporaryDirectory();
+      final tempPath =
+          '${tempDir.path}/temp_registro_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final tempFile = File(tempPath);
+
+      // Guardar con calidad optimizada (90%)
+      await tempFile.writeAsBytes(
+        img.encodeJpg(resizedImage, quality: 90),
+      );
+
+      // Eliminar el archivo original
+      await originalFile.delete();
+
+      return tempFile;
+    } catch (e) {
+      print('Error al procesar imagen: $e');
+
+      // Si hay error, devolver una copia del original
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final tempPath =
+            '${tempDir.path}/temp_registro_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final tempFile = File(tempPath);
+        await originalFile.copy(tempPath);
+        await originalFile.delete();
+        return tempFile;
+      } catch (copyError) {
+        print('Error al copiar imagen: $copyError');
+        return originalFile;
+      }
+    }
+  }
+
   int _calcularPosicion(int capturas) {
     int acumulado = 0;
     for (int i = 0; i < _posiciones.length; i++) {
@@ -395,9 +505,31 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
   void _mostrarError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.red.shade600,
+        content: Row(
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                msg,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: _dangerColor,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -414,11 +546,19 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
 
     if (_isLoading || !_camaraInicializada || _cameraController == null) {
       return Scaffold(
+        backgroundColor: _backgroundColor,
         appBar: AppBar(
-          title: const Text('Registro Facial'),
+          title: const Text(
+            'Registro Facial',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: _textPrimary,
+            ),
+          ),
           backgroundColor: Colors.white,
-          foregroundColor: Colors.deepPurple,
-          elevation: 1,
+          foregroundColor: _textPrimary,
+          elevation: 0,
+          centerTitle: true,
         ),
         body: WaveLoadingIndicator(
           message: _loadingMessage,
@@ -431,7 +571,7 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
     final pos = _posiciones[_posicionActual];
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: _backgroundColor,
       appBar: _buildAppBar(),
       body: SafeArea(
         child: Column(
@@ -483,10 +623,11 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 18,
+          color: _textPrimary,
         ),
       ),
       backgroundColor: Colors.white,
-      foregroundColor: Colors.deepPurple,
+      foregroundColor: _textPrimary,
       elevation: 0,
       centerTitle: true,
       actions: [
@@ -495,17 +636,36 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.deepPurple.shade400, Colors.deepPurple.shade700],
+              colors: [_primaryColor, _secondaryColor],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: _primaryColor.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          child: Text(
-            '${(prog * 100).toInt()}%',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.percent_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${(prog * 100).toInt()}%',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
         ),
       ],

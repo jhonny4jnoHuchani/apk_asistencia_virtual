@@ -25,6 +25,8 @@ dependencies:
   flutter_tts: ^4.2.5
   tutorial_coach_mark: ^1.2.11
   app_links: ^6.0.0
+  image: ^4.0.0
+  path_provider: ^2.1.0
 
 dev_dependencies:
   flutter_test:
