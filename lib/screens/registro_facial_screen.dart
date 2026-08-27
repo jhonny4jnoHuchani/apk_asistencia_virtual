@@ -39,7 +39,7 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
   double _loadingProgress = 0.0;
 
   int _capturasRealizadas = 0;
-  final int _totalCapturas = 50;
+  final int _totalCapturas = 76;
   int _posicionActual = 0;
   int _posicionAnunciada = -1;
   bool _capturando = false;
@@ -53,37 +53,43 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
       'nombre': 'centro',
       'descripcion': 'Mira directo a la cámara',
       'icono': Icons.center_focus_strong,
-      'instruccion': 'Frente a la cámara'
+      'instruccion': 'Frente a la cámara',
+      'total': 10,
     },
     {
       'nombre': 'izquierda',
-      'descripcion': 'Gira ligeramente a la izquierda',
+      'descripcion': 'Gira SUAVEMENTE a la izquierda',
       'icono': Icons.arrow_back,
-      'instruccion': 'Perfil izquierdo'
+      'instruccion': 'Perfil izquierdo suave',
+      'total': 14,
     },
     {
       'nombre': 'derecha',
-      'descripcion': 'Gira ligeramente a la derecha',
+      'descripcion': 'Gira SUAVEMENTE a la derecha',
       'icono': Icons.arrow_forward,
-      'instruccion': 'Perfil derecho'
+      'instruccion': 'Perfil derecho suave',
+      'total': 14,
     },
     {
       'nombre': 'arriba',
-      'descripcion': 'Inclina hacia arriba',
+      'descripcion': 'Inclina SUAVEMENTE hacia arriba',
       'icono': Icons.arrow_upward,
-      'instruccion': 'Mirando arriba'
+      'instruccion': 'Mirando arriba suavemente',
+      'total': 14,
     },
     {
       'nombre': 'abajo',
-      'descripcion': 'Inclina hacia abajo',
+      'descripcion': 'Inclina SUAVEMENTE hacia abajo',
       'icono': Icons.arrow_downward,
-      'instruccion': 'Mirando abajo'
+      'instruccion': 'Mirando abajo suavemente',
+      'total': 14,
     },
     {
       'nombre': 'sonrisa',
       'descripcion': 'Sonríe naturalmente',
       'icono': Icons.emoji_emotions,
-      'instruccion': 'Sonrisa natural'
+      'instruccion': 'Sonrisa natural',
+      'total': 10,
     },
   ];
 
@@ -101,8 +107,7 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
     if (_capturasRealizadas > _totalCapturas) {
       _capturasRealizadas = _totalCapturas;
     }
-    _posicionActual =
-        (_capturasRealizadas * _posiciones.length) ~/ _totalCapturas;
+    _posicionActual = _calcularPosicion(_capturasRealizadas);
     if (_posicionActual >= _posiciones.length) {
       _posicionActual = _posiciones.length - 1;
     }
@@ -355,9 +360,12 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
   }
 
   int _calcularPosicion(int capturas) {
-    int posicion = (capturas * _posiciones.length) ~/ _totalCapturas;
-    if (posicion >= _posiciones.length) posicion = _posiciones.length - 1;
-    return posicion;
+    int acumulado = 0;
+    for (int i = 0; i < _posiciones.length; i++) {
+      acumulado += _posiciones[i]['total'] as int;
+      if (capturas < acumulado) return i;
+    }
+    return _posiciones.length - 1;
   }
 
   void _mostrarCompletado() {

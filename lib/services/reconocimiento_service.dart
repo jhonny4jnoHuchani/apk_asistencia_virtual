@@ -40,27 +40,31 @@ class ReconocimientoService {
   }
 
   // ============================================
-  // VERIFICAR ROSTRO
+  // VERIFICAR ROSTRO CON GESTO ALEATORIO
   // POST /api/reconocimiento/verificar
-  // Body: imagen
-  // Respuesta: { match, resultado, confianza }
-  // NOTA: El backend ya llama esto automáticamente al marcar.
-  //       Este método queda preparado por si se necesita.
+  // Body: gesto_solicitado + foto_frontal + foto_gesto
+  // Respuesta: { match, gesture_detected, eyeglass_detected, spoofing_detected }
   // ============================================
   Future<Map<String, dynamic>> verificar({
-    required File image,
+    required String gestoSolicitado,
+    required File fotoFrontal,
+    required File fotoGesto,
   }) async {
     final streamedResponse = await _apiService.postMultipart(
       ApiConfig.verificar,
-      fields: {},
+      fields: {
+        'gesto_solicitado': gestoSolicitado,
+      },
       files: {
-        'imagen': image,
+        'foto_frontal': fotoFrontal,
+        'foto_gesto': fotoGesto,
       },
     );
 
     final response = await http.Response.fromStream(streamedResponse);
+    print('📥 VERIFICACIÓN: ${response.statusCode} - ${response.body}');
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(response.body);
     } else {
       final error = jsonDecode(response.body);

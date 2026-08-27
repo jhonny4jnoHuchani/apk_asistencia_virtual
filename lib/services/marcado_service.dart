@@ -13,8 +13,10 @@ class MarcadoService {
     required int horarioId,
     required double latitud,
     required double longitud,
-    required File fotoConstancia,
-    required File fotoRostro,
+    required String gestoSolicitado,
+    required File fotoFrontal,
+    required File fotoGesto,
+    File? fotoConstancia,
   }) async {
     try {
       final streamedResponse = await _apiService.postMultipart(
@@ -23,19 +25,32 @@ class MarcadoService {
           'horario_id': horarioId.toString(),
           'latitud': latitud.toString(),
           'longitud': longitud.toString(),
+          'gesto_solicitado': gestoSolicitado,
         },
         files: {
-          'foto_constancia': fotoConstancia,
-          'foto_rostro': fotoRostro,
+          'foto_frontal': fotoFrontal,
+          'foto_gesto': fotoGesto,
+          if (fotoConstancia != null) 'foto_constancia': fotoConstancia,
         },
       );
 
       final response = await http.Response.fromStream(streamedResponse);
-
       print('Marcar entrada status: ${response.statusCode}');
       print('Marcar entrada body: ${response.body}');
 
-      if (response.statusCode != 200 && response.statusCode != 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        if (data['eyeglass_detected'] == true) {
+          throw Exception('Quítese las gafas');
+        }
+        if (data['spoofing_detected'] == true) {
+          throw Exception('Intento de suplantación detectado');
+        }
+        if (data['gesture_detected'] == false) {
+          throw Exception('El gesto no coincide');
+        }
+        return;
+      } else {
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Error al marcar entrada');
       }
@@ -45,13 +60,18 @@ class MarcadoService {
     }
   }
 
-  // Marcar salida
+
+
+
+    // Marcar salida
   Future<void> marcarSalida({
     required int horarioId,
     required double latitud,
     required double longitud,
-    required File fotoConstancia,
-    required File fotoRostro,
+    required String gestoSolicitado,
+    required File fotoFrontal,
+    required File fotoGesto,
+    File? fotoConstancia,
   }) async {
     try {
       final streamedResponse = await _apiService.postMultipart(
@@ -60,19 +80,32 @@ class MarcadoService {
           'horario_id': horarioId.toString(),
           'latitud': latitud.toString(),
           'longitud': longitud.toString(),
+          'gesto_solicitado': gestoSolicitado,
         },
         files: {
-          'foto_constancia': fotoConstancia,
-          'foto_rostro': fotoRostro,
+          'foto_frontal': fotoFrontal,
+          'foto_gesto': fotoGesto,
+          if (fotoConstancia != null) 'foto_constancia': fotoConstancia,
         },
       );
 
       final response = await http.Response.fromStream(streamedResponse);
-
       print('Marcar salida status: ${response.statusCode}');
       print('Marcar salida body: ${response.body}');
 
-      if (response.statusCode != 200 && response.statusCode != 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        if (data['eyeglass_detected'] == true) {
+          throw Exception('Quítese las gafas');
+        }
+        if (data['spoofing_detected'] == true) {
+          throw Exception('Intento de suplantación detectado');
+        }
+        if (data['gesture_detected'] == false) {
+          throw Exception('El gesto no coincide');
+        }
+        return;
+      } else {
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Error al marcar salida');
       }
@@ -81,6 +114,8 @@ class MarcadoService {
       rethrow;
     }
   }
+
+
 
   // Historial con filtros
   Future<List<Marcado>> getHistorial({DateTime? fecha, int? mes}) async {

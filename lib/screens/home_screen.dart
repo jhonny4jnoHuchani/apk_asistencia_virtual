@@ -31,10 +31,13 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _tipoMarcado;
   int? _horarioIdSeleccionado;
 
-  // NUEVO: Para las 2 fotos
-  String? _etapaFoto; // 'rostro' o 'constancia'
-  File? _fotoRostro;
+  // NUEVO: Para las 3 fotos + gesto
+  String? _etapaFoto; // 'frontal', 'gesto' o 'constancia'
+  File? _fotoFrontal;
+  File? _fotoGesto;
   File? _fotoConstancia;
+  String? _gestoSolicitado;
+  Position? _posicionGPS;
 
   @override
   void initState() {
@@ -91,17 +94,35 @@ class _HomeScreenState extends State<HomeScreen> {
     final permisosOk = await _solicitarPermisos();
     if (!permisosOk) return;
 
+    // Obtener GPS ANTES de las fotos
+    try {
+      _posicionGPS = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+    } catch (e) {
+      _mostrarError('No se pudo obtener la ubicación GPS');
+      return;
+    }
+
     _tipoMarcado = tipo;
     _horarioIdSeleccionado = horarioId;
-
-    // Limpiar fotos anteriores
-    _fotoRostro = null;
+    _fotoFrontal = null;
+    _fotoGesto = null;
     _fotoConstancia = null;
 
-    // Empezar con la foto del ROSTRO
-    _etapaFoto = 'rostro';
+    // Generar gesto aleatorio
+    _gestoSolicitado = _generarGestoAleatorio();
+    _mostrarInfo(_instruccionGesto(_gestoSolicitado!));
+
+    // Empezar con foto FRONTAL
+    _etapaFoto = 'frontal';
     await _abrirCamara();
   }
+
+
+
+
+
 
   Future<void> _abrirCamara() async {
     try {
@@ -112,14 +133,14 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       CameraDescription camaraSeleccionada;
-      if (_etapaFoto == 'rostro') {
+      if (_etapaFoto == 'constancia') {
         camaraSeleccionada = cameras.firstWhere(
-          (c) => c.lensDirection == CameraLensDirection.front,
+          (c) => c.lensDirection == CameraLensDirection.back,
           orElse: () => cameras.first,
         );
       } else {
         camaraSeleccionada = cameras.firstWhere(
-          (c) => c.lensDirection == CameraLensDirection.back,
+          (c) => c.lensDirection == CameraLensDirection.front,
           orElse: () => cameras.first,
         );
       }
@@ -137,6 +158,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+
+
+
   Future<void> _capturarYMarcar() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized)
       return;
@@ -144,36 +168,37 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final XFile photo = await _cameraController!.takePicture();
 
-      // Guardar según etapa
-      if (_etapaFoto == 'rostro') {
-        _fotoRostro = File(photo.path);
-        // Cambiar a etapa constancia
+      // FRONTAL
+      if (_etapaFoto == 'frontal') {
+        _fotoFrontal = File(photo.path);
+        await _cameraController?.dispose();
+        setState(() {
+          _mostrarCamara = false;
+          _cameraController = null;
+          _etapaFoto = 'gesto';
+        });
+        _mostrarInfo(_instruccionGesto(_gestoSolicitado!));
+        await _abrirCamara();
+        return;
+      }
+
+      // GESTO
+      if (_etapaFoto == 'gesto') {
+        _fotoGesto = File(photo.path);
         await _cameraController?.dispose();
         setState(() {
           _mostrarCamara = false;
           _cameraController = null;
           _etapaFoto = 'constancia';
         });
-        _mostrarInfo('Ahora toma la foto de constancia (entorno)');
+        _mostrarInfo('Ahora toma la foto de constancia (opcional)');
         await _abrirCamara();
         return;
       }
 
-      // Es constancia
+      // CONSTANCIA
       _fotoConstancia = File(photo.path);
 
-      // Obtener GPS
-      Position? position;
-      try {
-        position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-      } catch (e) {
-        _mostrarError('No se pudo obtener la ubicación GPS');
-        return;
-      }
-
-      // Cerrar cámara
       await _cameraController?.dispose();
       setState(() {
         _mostrarCamara = false;
@@ -181,13 +206,16 @@ class _HomeScreenState extends State<HomeScreen> {
       });
 
       if (!mounted) return;
-      await _enviarMarcado(position);
+      await _enviarMarcado();
     } catch (e) {
       _mostrarError('Error al capturar foto');
     }
   }
 
-  Future<void> _enviarMarcado(Position position) async {
+
+
+
+  Future<void> _enviarMarcado() async {
     final horarioProvider = context.read<HorarioProvider>();
     try {
       showDialog(
@@ -199,18 +227,22 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_tipoMarcado == 'entrada') {
         await _marcadoService.marcarEntrada(
           horarioId: _horarioIdSeleccionado!,
-          latitud: position.latitude,
-          longitud: position.longitude,
-          fotoConstancia: _fotoConstancia!,
-          fotoRostro: _fotoRostro!,
+          latitud: _posicionGPS!.latitude,
+          longitud: _posicionGPS!.longitude,
+          gestoSolicitado: _gestoSolicitado!,
+          fotoFrontal: _fotoFrontal!,
+          fotoGesto: _fotoGesto!,
+          fotoConstancia: _fotoConstancia,
         );
       } else {
         await _marcadoService.marcarSalida(
           horarioId: _horarioIdSeleccionado!,
-          latitud: position.latitude,
-          longitud: position.longitude,
-          fotoConstancia: _fotoConstancia!,
-          fotoRostro: _fotoRostro!,
+          latitud: _posicionGPS!.latitude,
+          longitud: _posicionGPS!.longitude,
+          gestoSolicitado: _gestoSolicitado!,
+          fotoFrontal: _fotoFrontal!,
+          fotoGesto: _fotoGesto!,
+          fotoConstancia: _fotoConstancia,
         );
       }
 
@@ -231,6 +263,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+
+
+
   Future<void> _cancelarCamara() async {
     await _cameraController?.dispose();
     setState(() {
@@ -239,8 +274,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _tipoMarcado = null;
       _horarioIdSeleccionado = null;
       _etapaFoto = null;
-      _fotoRostro = null;
+      _fotoFrontal = null;
+      _fotoGesto = null;
       _fotoConstancia = null;
+      _gestoSolicitado = null;
+      _posicionGPS = null;
     });
   }
 
@@ -272,6 +310,29 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.blue,
           behavior: SnackBarBehavior.floating),
     );
+  }
+
+    String _generarGestoAleatorio() {
+    final gestos = ['arriba', 'abajo', 'izquierda', 'derecha', 'sonrisa'];
+    final random = DateTime.now().millisecondsSinceEpoch % gestos.length;
+    return gestos[random];
+  }
+
+  String _instruccionGesto(String gesto) {
+    switch (gesto) {
+      case 'arriba':
+        return 'Por favor, mire hacia arriba suavemente';
+      case 'abajo':
+        return 'Por favor, mire hacia abajo suavemente';
+      case 'izquierda':
+        return 'Por favor, gire suavemente hacia la izquierda';
+      case 'derecha':
+        return 'Por favor, gire suavemente hacia la derecha';
+      case 'sonrisa':
+        return 'Por favor, sonría para la cámara';
+      default:
+        return 'Por favor, mire al frente';
+    }
   }
 
   Future<void> _cerrarSesion() async {
@@ -413,7 +474,7 @@ class _HomeScreenState extends State<HomeScreen> {
             CameraPreview(_cameraController!),
 
             // Overlay óvalo SOLO para foto de rostro
-            if (_etapaFoto == 'rostro')
+            if (_etapaFoto == 'frontal' || _etapaFoto == 'gesto')
               Center(
                 child: Container(
                   width: 280,
@@ -434,9 +495,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.all(12),
                 color: Colors.black54,
                 child: Text(
-                  _etapaFoto == 'rostro'
-                      ? '📸 Foto de ROSTRO (selfie)'
-                      : '📸 Foto de CONSTANCIA (entorno)',
+
+                  _etapaFoto == 'frontal'
+                      ? '📸 Foto FRONTAL (mire al frente)'
+                      : _etapaFoto == 'gesto'
+                          ? '📸 Foto del GESTO (${_instruccionGesto(_gestoSolicitado!)})'
+                          : '📸 Foto de CONSTANCIA (entorno)',
+
+
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: Colors.white,
