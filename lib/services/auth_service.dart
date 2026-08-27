@@ -6,8 +6,9 @@ import 'api_service.dart';
 class AuthService {
   final ApiService _apiService = ApiService();
 
-  // Login
-  Future<Map<String, dynamic>> login(String email, String password, String deviceId) async {
+  // Login - usa POST (publico para obtener token)
+  Future<Map<String, dynamic>> login(
+      String email, String password, String deviceId) async {
     final response = await _apiService.post(
       ApiConfig.login,
       {
@@ -23,13 +24,14 @@ class AuthService {
       return data;
     } else {
       final error = jsonDecode(response.body);
-      throw Exception(error['message'] ?? 'Error al iniciar sesión');
+      throw Exception(error['message'] ?? 'Error al iniciar sesion');
     }
   }
 
-  // Cambiar contraseña
-  Future<void> cambiarPassword(String actual, String nueva, String confirmacion) async {
-    final response = await _apiService.post(
+  // Cambiar contraseña - usa postAuth (protegido)
+  Future<void> cambiarPassword(
+      String actual, String nueva, String confirmacion) async {
+    final response = await _apiService.postAuth(
       ApiConfig.cambiarPassword,
       {
         'password_actual': actual,
@@ -44,7 +46,52 @@ class AuthService {
     }
   }
 
-  // Obtener perfil
+  // Forgot Password - usa post (publico, SIN autenticacion)
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    print('AuthService: Enviando solicitud de recuperacion para: $email');
+
+    final response = await _apiService.post(
+      ApiConfig.forgotPassword,
+      {'email': email},
+    );
+
+    print('AuthService: Status: ${response.statusCode}');
+    print('AuthService: Body: ${response.body}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Error al enviar el correo');
+    }
+  }
+
+  // Reset Password - usa post (publico, SIN autenticacion)
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final response = await _apiService.post(
+      ApiConfig.resetPassword,
+      {
+        'email': email,
+        'token': token,
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Error al restablecer la contraseña');
+    }
+  }
+
+  // Obtener perfil - usa get (protegido)
   Future<User> getPerfil() async {
     final response = await _apiService.get(ApiConfig.perfil);
 
@@ -56,12 +103,13 @@ class AuthService {
     }
   }
 
-  // Logout
+  // Logout - usa postAuth (protegido)
   Future<void> logout() async {
     try {
-      await _apiService.post(ApiConfig.logout, {});
+      final response = await _apiService.postAuth(ApiConfig.logout, {});
+      print('Logout status: ${response.statusCode}');
     } catch (e) {
-      // Ignorar error si el servidor no responde
+      print('Error en logout: $e');
     }
     await _apiService.deleteToken();
   }

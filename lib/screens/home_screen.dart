@@ -30,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _mostrarCamara = false;
   String? _tipoMarcado;
   int? _horarioIdSeleccionado;
-  
+
   // NUEVO: Para las 2 fotos
   String? _etapaFoto; // 'rostro' o 'constancia'
   File? _fotoRostro;
@@ -76,8 +76,12 @@ class _HomeScreenState extends State<HomeScreen> {
           title: const Text('Biometría no disponible'),
           content: const Text('¿Desea continuar sin autenticación biométrica?'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Continuar')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar')),
+            ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Continuar')),
           ],
         ),
       );
@@ -89,11 +93,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _tipoMarcado = tipo;
     _horarioIdSeleccionado = horarioId;
-    
+
     // Limpiar fotos anteriores
     _fotoRostro = null;
     _fotoConstancia = null;
-    
+
     // Empezar con la foto del ROSTRO
     _etapaFoto = 'rostro';
     await _abrirCamara();
@@ -134,7 +138,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _capturarYMarcar() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (_cameraController == null || !_cameraController!.value.isInitialized)
+      return;
 
     try {
       final XFile photo = await _cameraController!.takePicture();
@@ -242,21 +247,30 @@ class _HomeScreenState extends State<HomeScreen> {
   void _mostrarError(String mensaje) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
+      SnackBar(
+          content: Text(mensaje),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating),
     );
   }
 
   void _mostrarExito(String mensaje) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating),
+      SnackBar(
+          content: Text(mensaje),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating),
     );
   }
 
   void _mostrarInfo(String mensaje) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), backgroundColor: Colors.blue, behavior: SnackBarBehavior.floating),
+      SnackBar(
+          content: Text(mensaje),
+          backgroundColor: Colors.blue,
+          behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -267,8 +281,12 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Cerrar sesión'),
         content: const Text('¿Estás seguro de cerrar sesión?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-          ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Cerrar sesión')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar')),
+          ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Cerrar sesión')),
         ],
       ),
     );
@@ -302,11 +320,27 @@ class _HomeScreenState extends State<HomeScreen> {
               MaterialPageRoute(builder: (_) => const GuiaDemoScreen()),
             ),
           ),
-          IconButton(icon: const Icon(Icons.face), tooltip: 'Registro Facial', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegistroFacialScreen()))),
-
-          IconButton(icon: const Icon(Icons.history), tooltip: 'Historial', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistorialScreen()))),
-          IconButton(icon: const Icon(Icons.person), tooltip: 'Perfil', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PerfilScreen()))),
-          IconButton(icon: const Icon(Icons.logout), tooltip: 'Cerrar sesión', onPressed: _cerrarSesion),
+          IconButton(
+              icon: const Icon(Icons.face),
+              tooltip: 'Registro Facial',
+              onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RegistroFacialScreen()))),
+          IconButton(
+              icon: const Icon(Icons.history),
+              tooltip: 'Historial',
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const HistorialScreen()))),
+          IconButton(
+              icon: const Icon(Icons.person),
+              tooltip: 'Perfil',
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const PerfilScreen()))),
+          IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Cerrar sesión',
+              onPressed: _cerrarSesion),
         ],
       ),
       body: Consumer<HorarioProvider>(
@@ -321,9 +355,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const Icon(Icons.error_outline, size: 60, color: Colors.red),
                   const SizedBox(height: 16),
-                  Text(horarioProvider.error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                  Text(horarioProvider.error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red)),
                   const SizedBox(height: 16),
-                  ElevatedButton(onPressed: () => horarioProvider.cargarHorarios(), child: const Text('Reintentar')),
+                  ElevatedButton(
+                      onPressed: () => horarioProvider.cargarHorarios(),
+                      child: const Text('Reintentar')),
                 ],
               ),
             );
@@ -335,9 +373,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Icon(Icons.event_busy, size: 80, color: Colors.grey.shade400),
                   const SizedBox(height: 16),
-                  const Text('No tienes horarios para hoy', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  const Text('No tienes horarios para hoy',
+                      style: TextStyle(fontSize: 18, color: Colors.grey)),
                   const SizedBox(height: 16),
-                  ElevatedButton(onPressed: () => horarioProvider.cargarHorarios(), child: const Text('Refrescar')),
+                  ElevatedButton(
+                      onPressed: () => horarioProvider.cargarHorarios(),
+                      child: const Text('Refrescar')),
                 ],
               ),
             );
@@ -370,12 +411,13 @@ class _HomeScreenState extends State<HomeScreen> {
           fit: StackFit.expand,
           children: [
             CameraPreview(_cameraController!),
-            
+
             // Overlay óvalo SOLO para foto de rostro
             if (_etapaFoto == 'rostro')
               Center(
                 child: Container(
-                  width: 280, height: 350,
+                  width: 280,
+                  height: 350,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(140),
                     border: Border.all(color: Colors.white, width: 2),
@@ -385,7 +427,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Texto informativo
             Positioned(
-              top: 20, left: 0, right: 0,
+              top: 20,
+              left: 0,
+              right: 0,
               child: Container(
                 padding: const EdgeInsets.all(12),
                 color: Colors.black54,
@@ -394,14 +438,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? '📸 Foto de ROSTRO (selfie)'
                       : '📸 Foto de CONSTANCIA (entorno)',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold),
                 ),
               ),
             ),
 
             // Botones
             Positioned(
-              bottom: 40, left: 0, right: 0,
+              bottom: 40,
+              left: 0,
+              right: 0,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -415,7 +464,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     heroTag: 'capture',
                     backgroundColor: Colors.white,
                     onPressed: _capturarYMarcar,
-                    child: const Icon(Icons.camera, color: Colors.black, size: 32),
+                    child:
+                        const Icon(Icons.camera, color: Colors.black, size: 32),
                   ),
                   const SizedBox(width: 56),
                 ],

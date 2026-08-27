@@ -1,10 +1,10 @@
 name: asistencia_docente
 description: App de asistencia docente con reconocimiento facial
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.1.0 <4.0.0'
+  sdk: ">=3.1.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -24,6 +24,7 @@ dependencies:
   local_auth: ^2.2.0
   flutter_tts: ^4.2.5
   tutorial_coach_mark: ^1.2.11
+  app_links: ^6.0.0
 
 dev_dependencies:
   flutter_test:

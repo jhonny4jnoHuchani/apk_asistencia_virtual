@@ -16,6 +16,11 @@ class ApiConfig {
   static const String perfil = '/auth/perfil';
 
   // ============================================
+  // ENDPOINTS DE RECUPERACION (PUBLICOS)
+  // ============================================
+  static const String forgotPassword = '/auth/forgot-password';
+  static const String resetPassword = '/auth/reset-password';
+  // ============================================
   // ENDPOINTS DE HORARIOS
   // ============================================
   static const String horariosHoy = '/horarios/hoy';

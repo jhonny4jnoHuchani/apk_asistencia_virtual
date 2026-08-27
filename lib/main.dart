@@ -10,6 +10,8 @@ import 'screens/cambio_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/registro_facial_screen.dart';
 import 'screens/guia_demo_screen.dart';
+import 'screens/forgot_password_screen.dart';
+import 'screens/reset_password_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,15 +51,39 @@ class MyApp extends StatelessWidget {
             elevation: 0,
           ),
         ),
+        initialRoute: '/',
+        onGenerateRoute: (settings) {
+          if (settings.name == '/') {
+            return MaterialPageRoute(builder: (_) => const SplashScreen());
+          }
+          if (settings.name == '/login') {
+            return MaterialPageRoute(builder: (_) => const LoginScreen());
+          }
+          if (settings.name == '/forgot-password') {
+            return MaterialPageRoute(
+              builder: (_) => const ForgotPasswordScreen(),
+            );
+          }
+          if (settings.name == '/reset-password') {
+            final args = settings.arguments as Map<String, String>?;
+            if (args != null) {
+              return MaterialPageRoute(
+                builder: (_) => ResetPasswordScreen(
+                  token: args['token']!,
+                  email: args['email']!,
+                ),
+              );
+            }
+          }
+
+          return MaterialPageRoute(builder: (_) => const SplashScreen());
+        },
         home: const SplashScreen(),
       ),
     );
   }
 }
 
-// ============================================
-// PANTALLA SPLASH - Verifica autenticación
-// ============================================
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -100,15 +126,12 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    // Verificar si ya vio el tutorial
     final prefs = await SharedPreferences.getInstance();
     final yaVioTutorial = prefs.getBool('ya_vio_tutorial') ?? false;
 
     if (!yaVioTutorial) {
-      // Primera vez → mostrar guía demo
       _irA(const GuiaDemoScreen());
     } else {
-      // Ya sabe usar la app → ir directo al Home
       _irA(const HomeScreen());
     }
   }

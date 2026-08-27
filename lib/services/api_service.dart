@@ -10,8 +10,8 @@ class ApiService {
   // ============================================
   // HEADERS
   // ============================================
-  
-  // Headers para peticiones JSON normales
+
+  // Headers para peticiones JSON con autenticacion
   Future<Map<String, String>> _getHeaders() async {
     final token = await _storage.read(key: 'token');
     return {
@@ -30,28 +30,42 @@ class ApiService {
     };
   }
 
+  // Headers sin autenticacion (para recuperacion de contraseña)
+  Map<String, String> _getPublicHeaders() {
+    return {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+  }
+
   // ============================================
-  // MÉTODOS HTTP
+  // METODOS HTTP
   // ============================================
 
-  // GET
+  // GET con autenticacion
   Future<http.Response> get(String endpoint) async {
     final headers = await _getHeaders();
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+
+    print('GET request a: $endpoint');
 
     try {
       final response = await http.get(url, headers: headers);
       checkUnauthorized(response);
       return response;
     } catch (e) {
-      throw Exception('Error de conexión: $e');
+      throw Exception('Error de conexion: $e');
     }
   }
 
-  // POST (JSON)
-  Future<http.Response> post(String endpoint, Map<String, dynamic> body) async {
+  // POST con autenticacion (para endpoints protegidos)
+  Future<http.Response> postAuth(
+      String endpoint, Map<String, dynamic> body) async {
     final headers = await _getHeaders();
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+
+    print('POST auth a: $endpoint');
+    print('Body: $body');
 
     try {
       final response = await http.post(
@@ -59,14 +73,41 @@ class ApiService {
         headers: headers,
         body: jsonEncode(body),
       );
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
       checkUnauthorized(response);
       return response;
     } catch (e) {
-      throw Exception('Error de conexión: $e');
+      throw Exception('Error de conexion: $e');
     }
   }
 
-  // POST MULTIPART (para enviar fotos)
+  // POST sin autenticacion (para endpoints publicos como forgot-password)
+  Future<http.Response> post(String endpoint, Map<String, dynamic> body) async {
+    final headers = _getPublicHeaders();
+    final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+
+    print('POST public a: $endpoint');
+    print('Body: $body');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      // No verificamos 401 porque este endpoint es publico
+      return response;
+    } catch (e) {
+      throw Exception('Error de conexion: $e');
+    }
+  }
+
+  // POST MULTIPART (para enviar fotos con autenticacion)
   Future<http.StreamedResponse> postMultipart(
     String endpoint, {
     required Map<String, String> fields,
@@ -74,6 +115,9 @@ class ApiService {
   }) async {
     final headers = await _getMultipartHeaders();
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+
+    print('POST multipart a: $endpoint');
+    print('Fields: $fields');
 
     final request = http.MultipartRequest('POST', url);
     request.headers.addAll(headers);
@@ -83,9 +127,14 @@ class ApiService {
 
     // Agregar archivos
     for (final entry in files.entries) {
-      request.files.add(
-        await http.MultipartFile.fromPath(entry.key, entry.value.path),
-      );
+      if (await entry.value.exists()) {
+        request.files.add(
+          await http.MultipartFile.fromPath(entry.key, entry.value.path),
+        );
+        print('Archivo agregado: ${entry.key} - ${entry.value.path}');
+      } else {
+        print('Archivo no existe: ${entry.key} - ${entry.value.path}');
+      }
     }
 
     try {
@@ -100,7 +149,7 @@ class ApiService {
         headers: response.headers,
       );
     } catch (e) {
-      if (e is Exception && e.toString().contains('Sesión expirada')) rethrow;
+      if (e is Exception && e.toString().contains('Sesion expirada')) rethrow;
       throw Exception('Error al enviar archivos: $e');
     }
   }
@@ -109,26 +158,34 @@ class ApiService {
   // MANEJO DE TOKEN
   // ============================================
 
-  // Verificar si el token expiró (401)
+  // Verificar si el token expiro (401)
   void checkUnauthorized(http.Response response) {
     if (response.statusCode == 401) {
       _storage.delete(key: 'token');
-      throw Exception('Sesión expirada. Inicie sesión nuevamente.');
+      throw Exception('Sesion expirada. Inicie sesion nuevamente.');
     }
   }
 
   // Guardar token
   Future<void> saveToken(String token) async {
+    print('Token guardado: ${token.substring(0, 20)}...');
     await _storage.write(key: 'token', value: token);
   }
 
   // Obtener token
   Future<String?> getToken() async {
-    return await _storage.read(key: 'token');
+    final token = await _storage.read(key: 'token');
+    if (token != null) {
+      print('Token recuperado: ${token.substring(0, 20)}...');
+    } else {
+      print('Token no encontrado');
+    }
+    return token;
   }
 
   // Eliminar token
   Future<void> deleteToken() async {
     await _storage.delete(key: 'token');
+    print('Token eliminado');
   }
 }

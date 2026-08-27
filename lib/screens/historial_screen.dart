@@ -16,8 +16,8 @@ class _HistorialScreenState extends State<HistorialScreen> {
   List<Marcado> _marcados = [];
   bool _isLoading = true;
   String? _error;
+  String? _debugInfo;
 
-  // Filtros
   DateTime? _filtroFecha;
   int? _filtroMes;
 
@@ -27,47 +27,51 @@ class _HistorialScreenState extends State<HistorialScreen> {
     _cargarHistorial();
   }
 
-  // ============================================
-  // CARGA DE DATOS
-  // ============================================
   Future<void> _cargarHistorial() async {
     setState(() {
       _isLoading = true;
       _error = null;
+      _debugInfo = null;
     });
 
     try {
-      _marcados = await _marcadoService.getHistorial(
+      final resultado = await _marcadoService.getHistorial(
         fecha: _filtroFecha,
         mes: _filtroMes,
       );
+
       setState(() {
+        _marcados = resultado;
         _isLoading = false;
+        _debugInfo = 'Total: ${resultado.length} marcados';
+
+        if (resultado.isNotEmpty) {
+          _debugInfo =
+              'Total: ${resultado.length} marcados - Ejemplo: ${resultado[0].materia} (${resultado[0].tipo})';
+        }
       });
     } catch (e) {
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');
         _isLoading = false;
+        _debugInfo = 'Error: $e';
       });
     }
   }
 
-  // ============================================
-  // FILTROS
-  // ============================================
   Future<void> _seleccionarFecha() async {
     final fecha = await showDatePicker(
       context: context,
       initialDate: _filtroFecha ?? DateTime.now(),
       firstDate: DateTime(2024),
       lastDate: DateTime.now(),
-      locale: const Locale('es'),
+      locale: const Locale('es', 'ES'),
     );
 
     if (fecha != null) {
       setState(() {
         _filtroFecha = fecha;
-        _filtroMes = null; // Limpiar filtro de mes
+        _filtroMes = null;
       });
       _cargarHistorial();
     }
@@ -78,7 +82,10 @@ class _HistorialScreenState extends State<HistorialScreen> {
       context: context,
       builder: (context) {
         return SimpleDialog(
-          title: const Text('Seleccionar mes'),
+          title: const Text(
+            'Seleccionar mes',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           children: List.generate(12, (index) {
             final mesNum = index + 1;
             final mesNombre = DateFormat('MMMM', 'es').format(
@@ -86,9 +93,12 @@ class _HistorialScreenState extends State<HistorialScreen> {
             );
             return SimpleDialogOption(
               onPressed: () => Navigator.of(context).pop(mesNum),
-              child: Text(
-                mesNombre[0].toUpperCase() + mesNombre.substring(1),
-                style: const TextStyle(fontSize: 16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  mesNombre[0].toUpperCase() + mesNombre.substring(1),
+                  style: const TextStyle(fontSize: 16),
+                ),
               ),
             );
           }),
@@ -99,7 +109,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
     if (mes != null) {
       setState(() {
         _filtroMes = mes;
-        _filtroFecha = null; // Limpiar filtro de fecha
+        _filtroFecha = null;
       });
       _cargarHistorial();
     }
@@ -113,33 +123,43 @@ class _HistorialScreenState extends State<HistorialScreen> {
     _cargarHistorial();
   }
 
-  // ============================================
-  // UI
-  // ============================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historial de Marcados'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _cargarHistorial,
+            tooltip: 'Actualizar',
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Filtros
           _buildFiltros(),
-          // Contenido
+          if (_debugInfo != null)
+            Container(
+              padding: const EdgeInsets.all(8),
+              color: Colors.grey.shade200,
+              child: Text(
+                _debugInfo!,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
           Expanded(child: _buildContenido()),
         ],
       ),
     );
   }
 
-  // Widget de filtros
   Widget _buildFiltros() {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withValues(alpha: 0.1),
@@ -150,7 +170,6 @@ class _HistorialScreenState extends State<HistorialScreen> {
       ),
       child: Row(
         children: [
-          // Filtro por fecha
           Expanded(
             child: OutlinedButton.icon(
               onPressed: _seleccionarFecha,
@@ -162,7 +181,8 @@ class _HistorialScreenState extends State<HistorialScreen> {
                 style: const TextStyle(fontSize: 13),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: _filtroFecha != null ? Colors.blue : Colors.grey,
+                foregroundColor:
+                    _filtroFecha != null ? Colors.blue : Colors.grey,
                 side: BorderSide(
                   color: _filtroFecha != null ? Colors.blue : Colors.grey,
                 ),
@@ -170,19 +190,14 @@ class _HistorialScreenState extends State<HistorialScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // Filtro por mes
           Expanded(
             child: OutlinedButton.icon(
               onPressed: _seleccionarMes,
               icon: const Icon(Icons.date_range, size: 18),
               label: Text(
                 _filtroMes != null
-                    ? DateFormat('MMMM', 'es').format(
-                        DateTime(2024, _filtroMes!, 1),
-                      )[0].toUpperCase() +
-                        DateFormat('MMMM', 'es')
-                            .format(DateTime(2024, _filtroMes!, 1))
-                            .substring(1)
+                    ? _capitalizarMes(DateFormat('MMMM', 'es')
+                        .format(DateTime(2024, _filtroMes!, 1)))
                     : 'Por mes',
                 style: const TextStyle(fontSize: 13),
               ),
@@ -194,7 +209,6 @@ class _HistorialScreenState extends State<HistorialScreen> {
               ),
             ),
           ),
-          // Limpiar filtros
           if (_filtroFecha != null || _filtroMes != null)
             IconButton(
               onPressed: _limpiarFiltros,
@@ -206,7 +220,10 @@ class _HistorialScreenState extends State<HistorialScreen> {
     );
   }
 
-  // Contenido principal
+  String _capitalizarMes(String mes) {
+    return mes[0].toUpperCase() + mes.substring(1);
+  }
+
   Widget _buildContenido() {
     if (_isLoading) {
       return const LoadingIndicator(mensaje: 'Cargando historial...');
@@ -267,41 +284,80 @@ class _HistorialScreenState extends State<HistorialScreen> {
     );
   }
 
-  // Card de marcado individual
   Widget _buildMarcadoCard(Marcado marcado) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
       ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: marcado.tipo == 'entrada'
-              ? Colors.green.shade100
-              : Colors.red.shade100,
-          child: Icon(
-            marcado.tipo == 'entrada' ? Icons.login : Icons.logout,
-            color: marcado.tipo == 'entrada' ? Colors.green : Colors.red,
-          ),
-        ),
-        title: Text(
-          marcado.materia,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
+      elevation: 2,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Paralelo: ${marcado.paralelo}'),
-            Text(
-              '${DateFormat('dd/MM/yyyy').format(marcado.fecha)} - ${marcado.hora}',
+            CircleAvatar(
+              backgroundColor: marcado.tipo == 'entrada'
+                  ? Colors.green.shade100
+                  : Colors.red.shade100,
+              child: Icon(
+                marcado.tipo == 'entrada' ? Icons.login : Icons.logout,
+                color: marcado.tipo == 'entrada' ? Colors.green : Colors.red,
+                size: 20,
+              ),
             ),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            // Tipo de marcado
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    marcado.materia,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Paralelo: ${marcado.paralelo}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${DateFormat('dd/MM/yyyy').format(marcado.fecha)} - ${marcado.hora}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: marcado.esPuntual
+                          ? Colors.blue.shade50
+                          : Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      marcado.esPuntual ? 'Puntual' : 'Retraso',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: marcado.esPuntual
+                            ? Colors.blue.shade700
+                            : Colors.orange.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -309,32 +365,20 @@ class _HistorialScreenState extends State<HistorialScreen> {
                     ? Colors.green.shade50
                     : Colors.red.shade50,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: marcado.tipo == 'entrada'
+                      ? Colors.green.shade200
+                      : Colors.red.shade200,
+                ),
               ),
               child: Text(
                 marcado.tipo == 'entrada' ? 'Entrada' : 'Salida',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: marcado.tipo == 'entrada' ? Colors.green : Colors.red,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            // Estado (puntual/retraso)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: marcado.esPuntual
-                    ? Colors.blue.shade50
-                    : Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                marcado.estado,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: marcado.esPuntual ? Colors.blue : Colors.orange,
+                  color: marcado.tipo == 'entrada'
+                      ? Colors.green.shade700
+                      : Colors.red.shade700,
                 ),
               ),
             ),
