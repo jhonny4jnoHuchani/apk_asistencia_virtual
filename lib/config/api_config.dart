@@ -5,7 +5,7 @@ class ApiConfig {
   // Emulador Android: 10.0.2.2
   // iOS Simulator:    127.0.0.1
   // Dispositivo real: IP de tu computadora (ej: 192.168.1.100)
-  static const String baseUrl = 'http://172.20.0.24:8000/api';
+  static const String baseUrl = 'http://172.18.236.27:8000/api';
 
   // ============================================
   // ENDPOINTS DE AUTENTICACIÓN

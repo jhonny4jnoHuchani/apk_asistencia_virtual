@@ -84,8 +84,10 @@ class _CameraMarcadoScreenState extends State<CameraMarcadoScreen>
   Widget _buildCameraPreview() {
     // Mostrar la cámara solo dentro del área del marco 3x4
     final screenSize = MediaQuery.of(context).size;
-    final frameWidth = screenSize.width * 0.75;
-    final frameHeight = frameWidth * 1.333; // Relación 3:4
+    // final frameWidth = screenSize.width * 0.75;
+    final frameWidth = screenSize.width * 0.70;
+    // final frameHeight = frameWidth * 1.333; // Relación 3:4
+    final frameHeight = frameWidth * 1.555; // Relación 3:4
 
     return Center(
       child: Container(
@@ -112,8 +114,8 @@ class _CameraMarcadoScreenState extends State<CameraMarcadoScreen>
 
   Widget _buildPhotoFrame() {
     final screenSize = MediaQuery.of(context).size;
-    final frameWidth = screenSize.width * 0.75;
-    final frameHeight = frameWidth * 1.333;
+    final frameWidth = screenSize.width * 0.70;
+    final frameHeight = frameWidth * 1.555; // Relación 3:4
 
     return Center(
       child: AnimatedBuilder(
