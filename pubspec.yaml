@@ -21,7 +21,7 @@ dependencies:
   intl: ^0.20.2
   provider: ^6.1.1
   device_info_plus: ^10.0.0
-  local_auth: ^2.2.0
+  local_auth: ^3.0.2
   flutter_tts: ^4.2.5
   tutorial_coach_mark: ^1.2.11
   app_links: ^6.0.0

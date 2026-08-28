@@ -49,10 +49,6 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
   int _intentosFallidos = 0;
   final int _maxIntentosFallidos = 3;
 
-  // Variables para manejo de lentes
-  bool _mostrarAlertaLentes = false;
-  String _mensajeLentes = '';
-
   // Constantes de diseño
   static const Color _primaryColor = Color(0xFF5B67CA);
   static const Color _secondaryColor = Color(0xFF8B95E0);
@@ -227,7 +223,7 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
 
       _cameraController = CameraController(
         frontal,
-        ResolutionPreset.high,
+        ResolutionPreset.high, // Cambiado a high para mejor calidad
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -247,7 +243,7 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
         _camaraInicializada = true;
         _isLoading = false;
         _loadingProgress = 1.0;
-        _loadingMessage = 'Listo!';
+        _loadingMessage = '¡Listo!';
       });
     } catch (e) {
       setState(() {
@@ -270,7 +266,6 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
     setState(() {
       _modoAutomatico = true;
       _intentosFallidos = 0;
-      _mostrarAlertaLentes = false;
     });
 
     await _flutterTts
@@ -318,15 +313,13 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
       return;
     }
 
-    setState(() {
-      _capturando = true;
-      _mostrarAlertaLentes = false;
-    });
+    setState(() => _capturando = true);
 
     try {
       final photo = await _cameraController!.takePicture();
       final posicion = _posiciones[_posicionActual]['nombre']!;
 
+      // Procesar la imagen: recortar a 3x4 y optimizar
       final processedFile = await _procesarImagen(File(photo.path));
 
       final response = await _reconocimientoService.registrarEmbedding(
@@ -334,78 +327,37 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
         image: processedFile,
       );
 
+      // Limpiar archivo temporal
       await processedFile.delete();
 
       if (!mounted) return;
 
-      // ============================================
-      // VERIFICAR DETECCION DE LENTES
-      // ============================================
-      if (_reconocimientoService.isEyeglassDetected(response)) {
-        setState(() {
-          _capturando = false;
-          _intentosFallidos++;
-          _mostrarAlertaLentes = true;
-          _mensajeLentes = _reconocimientoService.getEyeglassMessage(response);
-        });
+      final totalEmbeddings =
+          response['total_embeddings'] ?? _capturasRealizadas + 1;
+      final calidad = response['quality_score'] ?? 0.0;
 
-        await _flutterTts.speak('Por favor, quítese las gafas');
-        return;
-      }
+      setState(() {
+        _capturasRealizadas = totalEmbeddings;
+        _calidadPromedio =
+            ((_calidadPromedio * (totalEmbeddings - 1) + calidad) /
+                    totalEmbeddings)
+                .round();
+        _capturando = false;
+        _intentosFallidos = 0;
+      });
 
-      // ============================================
-      // VERIFICAR SPOOFING
-      // ============================================
-      if (_reconocimientoService.isSpoofingDetected(response)) {
-        setState(() {
-          _capturando = false;
-          _intentosFallidos++;
-        });
-        _mostrarError('Posible suplantación detectada');
-        await _flutterTts.speak('Posible suplantación detectada');
-        return;
-      }
-
-      // ============================================
-      // PROCESAR REGISTRO EXITOSO
-      // ============================================
-      if (response['success'] == true) {
-        final totalEmbeddings =
-            response['total_embeddings'] ?? _capturasRealizadas + 1;
-        final calidad = response['quality_score'] ?? 0.0;
-
-        setState(() {
-          _capturasRealizadas = totalEmbeddings;
-          _calidadPromedio =
-              ((_calidadPromedio * (totalEmbeddings - 1) + calidad) /
-                      totalEmbeddings)
-                  .round();
-          _capturando = false;
-          _intentosFallidos = 0;
-          _mostrarAlertaLentes = false;
-        });
-
-        final authProvider = context.read<AuthProvider>();
-        await authProvider.actualizarPerfil();
-
-        final nuevaPosicion = _calcularPosicion(totalEmbeddings);
-        if (nuevaPosicion != _posicionActual) {
-          setState(() => _posicionActual = nuevaPosicion);
-          if (_modoAutomatico) {
-            _posicionAnunciada = nuevaPosicion;
-            await _hablarInstruccion(_posiciones[nuevaPosicion]['nombre']!);
-            await Future.delayed(const Duration(milliseconds: 400));
-          }
+      final nuevaPosicion = _calcularPosicion(totalEmbeddings);
+      if (nuevaPosicion != _posicionActual) {
+        setState(() => _posicionActual = nuevaPosicion);
+        if (_modoAutomatico) {
+          _posicionAnunciada = nuevaPosicion;
+          await _hablarInstruccion(_posiciones[nuevaPosicion]['nombre']!);
+          await Future.delayed(const Duration(milliseconds: 400));
         }
-      } else {
-        final mensaje = response['message'] ?? 'Error al registrar';
-        _mostrarError(mensaje);
-
-        setState(() {
-          _capturando = false;
-          _intentosFallidos++;
-        });
       }
+
+      final authProvider = context.read<AuthProvider>();
+      await authProvider.actualizarPerfil();
     } catch (e) {
       if (!mounted) return;
 
@@ -423,12 +375,15 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
     }
   }
 
+  // Nuevo método para procesar la imagen
   Future<File> _procesarImagen(File originalFile) async {
     try {
+      // Leer la imagen
       final bytes = await originalFile.readAsBytes();
       final image = img.decodeImage(bytes);
 
       if (image == null) {
+        // Si no se puede procesar, devolver el original
         final tempDir = await getTemporaryDirectory();
         final tempPath =
             '${tempDir.path}/temp_registro_${DateTime.now().millisecondsSinceEpoch}.jpg';
@@ -438,24 +393,28 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
         return tempFile;
       }
 
+      // 1. Recortar a formato 3x4 (relación de aspecto 0.75)
       final originalWidth = image.width;
       final originalHeight = image.height;
-      final targetRatio = 0.75;
+      final targetRatio = 0.75; // 3/4
 
       int cropWidth, cropHeight, offsetX, offsetY;
 
       if (originalWidth / originalHeight > targetRatio) {
+        // La imagen es más ancha de lo necesario
         cropHeight = originalHeight;
         cropWidth = (originalHeight * targetRatio).round();
         offsetX = ((originalWidth - cropWidth) / 2).round();
         offsetY = 0;
       } else {
+        // La imagen es más alta de lo necesario
         cropWidth = originalWidth;
         cropHeight = (originalWidth / targetRatio).round();
         offsetX = 0;
         offsetY = ((originalHeight - cropHeight) / 2).round();
       }
 
+      // Recortar la imagen
       final croppedImage = img.copyCrop(
         image,
         x: offsetX,
@@ -464,6 +423,7 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
         height: cropHeight,
       );
 
+      // 2. Redimensionar para optimizar (máximo 800px de ancho)
       final int maxWidth = 800;
       img.Image resizedImage = croppedImage;
 
@@ -475,19 +435,25 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
         );
       }
 
+      // 3. Guardar la imagen procesada
       final tempDir = await getTemporaryDirectory();
       final tempPath =
           '${tempDir.path}/temp_registro_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final tempFile = File(tempPath);
 
+      // Guardar con calidad optimizada (90%)
       await tempFile.writeAsBytes(
         img.encodeJpg(resizedImage, quality: 90),
       );
 
+      // Eliminar el archivo original
       await originalFile.delete();
+
       return tempFile;
     } catch (e) {
       print('Error al procesar imagen: $e');
+
+      // Si hay error, devolver una copia del original
       try {
         final tempDir = await getTemporaryDirectory();
         final tempPath =
@@ -569,100 +535,6 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
     );
   }
 
-  // ============================================
-  // DIALOGO DE ALERTA POR LENTES
-  // ============================================
-  void _mostrarDialogoLentes() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Row(
-          children: [
-            Icon(
-              Icons.visibility_off_rounded,
-              color: Colors.orange.shade700,
-              size: 28,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Gafas detectadas',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.orange.shade700,
-                fontSize: 20,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.emoji_emotions_rounded,
-              size: 64,
-              color: Colors.orange,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _mensajeLentes.isNotEmpty
-                  ? _mensajeLentes
-                  : 'Por favor, quítese las gafas para continuar con el registro facial.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.lightbulb_outline_rounded,
-                    color: Colors.orange.shade700,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Quítate las gafas y presiona "Intentar de nuevo"',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _mostrarAlertaLentes = false;
-                _intentosFallidos = 0;
-              });
-            },
-            child: const Text('Intentar de nuevo'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_errorCamara != null) {
@@ -702,173 +574,40 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
       backgroundColor: _backgroundColor,
       appBar: _buildAppBar(),
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            Column(
-              children: [
-                ProgressSection(
-                  capturasRealizadas: _capturasRealizadas,
-                  totalCapturas: _totalCapturas,
-                  posicionActual: _posicionActual,
-                  totalPosiciones: _posiciones.length,
-                  calidadPromedio: _calidadPromedio,
-                ),
-                CameraPreviewContainer(
-                  cameraController: _cameraController!,
-                  posicion: pos,
-                  isCapturing: _capturando,
-                  isComplete: isComplete,
-                ),
-                StatusBar(
-                  posicion: pos,
-                  isAutomaticMode: _modoAutomatico,
-                  isCapturing: _capturando,
-                  capturasRealizadas: _capturasRealizadas,
-                  totalCapturas: _totalCapturas,
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                  child: _modoAutomatico
-                      ? StopButton(
-                          onPressed: _detenerCaptura,
-                          capturasRealizadas: _capturasRealizadas,
-                          totalCapturas: _totalCapturas,
-                        )
-                      : StartButton(onPressed: _iniciarCapturaAutomatica),
-                ),
-                const SizedBox(height: 12),
-              ],
+            ProgressSection(
+              capturasRealizadas: _capturasRealizadas,
+              totalCapturas: _totalCapturas,
+              posicionActual: _posicionActual,
+              totalPosiciones: _posiciones.length,
+              calidadPromedio: _calidadPromedio,
             ),
-            // ============================================
-            // OVERLAY DE ALERTA DE LENTES
-            // ============================================
-            if (_mostrarAlertaLentes)
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withOpacity(0.7),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(24),
-                      margin: const EdgeInsets.symmetric(horizontal: 32),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Icono animado
-                          TweenAnimationBuilder(
-                            tween: Tween<double>(begin: 0.8, end: 1.0),
-                            duration: const Duration(milliseconds: 500),
-                            builder: (context, value, child) {
-                              return Transform.scale(
-                                scale: value,
-                                child: child,
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade50,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.visibility_off_rounded,
-                                color: Colors.orange.shade700,
-                                size: 48,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Gafas detectadas',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange.shade700,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _mensajeLentes.isNotEmpty
-                                ? _mensajeLentes
-                                : 'Por favor, quítese las gafas para continuar.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.orange.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline_rounded,
-                                  color: Colors.orange.shade700,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                const Expanded(
-                                  child: Text(
-                                    'Quítate las gafas y presiona "Intentar de nuevo"',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _mostrarAlertaLentes = false;
-                                  _intentosFallidos = 0;
-                                });
-                              },
-                              icon: const Icon(Icons.refresh_rounded),
-                              label: const Text(
-                                'Intentar de nuevo',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            CameraPreviewContainer(
+              cameraController: _cameraController!,
+              posicion: pos,
+              isCapturing: _capturando,
+              isComplete: isComplete,
+            ),
+            StatusBar(
+              posicion: pos,
+              isAutomaticMode: _modoAutomatico,
+              isCapturing: _capturando,
+              capturasRealizadas: _capturasRealizadas,
+              totalCapturas: _totalCapturas,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              child: _modoAutomatico
+                  ? StopButton(
+                      onPressed: _detenerCaptura,
+                      capturasRealizadas: _capturasRealizadas,
+                      totalCapturas: _totalCapturas,
+                    )
+                  : StartButton(onPressed: _iniciarCapturaAutomatica),
+            ),
+            const SizedBox(height: 12),
           ],
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import 'cambio_password_screen.dart';
 import 'registro_facial_screen.dart';
@@ -20,96 +21,124 @@ class _PerfilScreenState extends State<PerfilScreen> {
   bool _isBiometricAvailable = false;
   final LocalAuthentication _localAuth = LocalAuthentication();
 
+  // Clave para SharedPreferences
+  static const String _biometricPrefKey = 'biometric_enabled';
+
+  // Constantes de diseño
+  static const Color _primaryColor = Color(0xFF5B67CA);
+  static const Color _secondaryColor = Color(0xFF8B95E0);
+  static const Color _backgroundColor = Color(0xFFF8F9FC);
+  static const Color _textPrimary = Color(0xFF2D3436);
+  static const Color _textSecondary = Color(0xFF636E72);
+  static const Color _successColor = Color(0xFF00B894);
+  static const Color _warningColor = Color(0xFFFDCB6E);
+  static const Color _dangerColor = Color(0xFFE17055);
+  static const Color _infoColor = Color(0xFF74B9FF);
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().actualizarPerfil();
-      _verificarEstadoBiometrico();
+      _cargarEstadoBiometrico();
     });
   }
 
-  Future<void> _verificarEstadoBiometrico() async {
+  Future<void> _cargarEstadoBiometrico() async {
+    await _verificarDisponibilidadBiometrica();
+    await _cargarPreferenciaBiometrica();
+  }
+
+  Future<void> _verificarDisponibilidadBiometrica() async {
     try {
       final isAvailable = await _localAuth.canCheckBiometrics;
       final isDeviceSupported = await _localAuth.isDeviceSupported();
       final enrolled = await _localAuth.getAvailableBiometrics();
 
-      setState(() {
-        _isBiometricAvailable =
-            isAvailable && isDeviceSupported && enrolled.isNotEmpty;
-        _biometricEnabled = _isBiometricAvailable;
-      });
+      if (mounted) {
+        setState(() {
+          _isBiometricAvailable =
+              isAvailable && isDeviceSupported && enrolled.isNotEmpty;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isBiometricAvailable = false;
-        _biometricEnabled = false;
-      });
+      print('Error al verificar biometría: $e');
+      if (mounted) {
+        setState(() {
+          _isBiometricAvailable = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _cargarPreferenciaBiometrica() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedPreference = prefs.getBool(_biometricPrefKey);
+
+      if (mounted) {
+        setState(() {
+          _biometricEnabled = savedPreference ?? false;
+        });
+      }
+    } catch (e) {
+      print('Error al cargar preferencia: $e');
+      if (mounted) {
+        setState(() {
+          _biometricEnabled = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _guardarPreferenciaBiometrica(bool enabled) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_biometricPrefKey, enabled);
+    } catch (e) {
+      print('Error al guardar preferencia biométrica: $e');
+    }
+  }
+
+  // Método principal para alternar biometría
+  Future<void> _toggleBiometria(bool value) async {
+    if (value) {
+      // Habilitar biometría
+      await _habilitarBiometria();
+    } else {
+      // Deshabilitar biometría
+      await _deshabilitarBiometria();
     }
   }
 
   Future<void> _habilitarBiometria() async {
     if (!_isBiometricAvailable) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Este dispositivo no soporta autenticación biométrica'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+      _mostrarSnackBar(
+        'Este dispositivo no soporta autenticación biométrica',
+        _warningColor,
+      );
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
+      // Autenticar para habilitar
       final authenticated = await _localAuth.authenticate(
-        localizedReason:
-            'Habilita la autenticación biométrica para acceder más rápido',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: true,
-        ),
+        localizedReason: 'Confirma tu identidad para habilitar la biometría',
       );
 
       if (authenticated) {
-        setState(() {
-          _biometricEnabled = true;
-        });
-
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Biometría habilitada correctamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        setState(() => _biometricEnabled = true);
+        await _guardarPreferenciaBiometrica(true);
+        _mostrarSnackBar('Biometría habilitada correctamente', _successColor);
       } else {
-        setState(() {
-          _biometricEnabled = false;
-        });
-
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No se pudo habilitar la biometría'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        setState(() => _biometricEnabled = false);
+        await _guardarPreferenciaBiometrica(false);
+        _mostrarSnackBar('No se pudo habilitar la biometría', _dangerColor);
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al habilitar biometría: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _mostrarSnackBar('Error al habilitar biometría: $e', _dangerColor);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -117,13 +146,79 @@ class _PerfilScreenState extends State<PerfilScreen> {
     }
   }
 
+  Future<void> _deshabilitarBiometria() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Autenticar para deshabilitar
+      final authenticated = await _localAuth.authenticate(
+        localizedReason: 'Confirma tu identidad para deshabilitar la biometría',
+      );
+
+      if (authenticated) {
+        setState(() => _biometricEnabled = false);
+        await _guardarPreferenciaBiometrica(false);
+        _mostrarSnackBar(
+            'Biometría deshabilitada correctamente', _successColor);
+      } else {
+        // Mantener el estado anterior
+        setState(() => _biometricEnabled = true);
+        _mostrarSnackBar('No se pudo deshabilitar la biometría', _dangerColor);
+      }
+    } catch (e) {
+      setState(() => _biometricEnabled = true);
+      _mostrarSnackBar('Error al deshabilitar biometría: $e', _dangerColor);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _mostrarSnackBar(String mensaje, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              color == _successColor
+                  ? Icons.check_circle_rounded
+                  : color == _warningColor
+                      ? Icons.warning_rounded
+                      : Icons.error_outline_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(mensaje)),
+          ],
+        ),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: const Text('Mi Perfil'),
+        title: const Text(
+          'Mi Perfil',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: _textPrimary,
+          ),
+        ),
         centerTitle: true,
         elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: _textPrimary,
       ),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
@@ -131,14 +226,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
           if (user == null) {
             return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Cargando información del usuario...'),
-                ],
-              ),
+              child: CircularProgressIndicator(color: _primaryColor),
             );
           }
 
@@ -146,19 +234,18 @@ class _PerfilScreenState extends State<PerfilScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _buildHeader(user, authProvider),
-                const SizedBox(height: 24),
+                _buildHeader(user),
+                const SizedBox(height: 20),
                 _buildInfoCard(user, authProvider),
                 const SizedBox(height: 20),
-                _buildBiometricCard(authProvider), // Biometría en el medio
+                _buildBiometricCard(),
                 const SizedBox(height: 20),
-                _buildSecuritySection(authProvider),
+                _buildSecuritySection(),
                 const SizedBox(height: 20),
                 _buildActionsSection(context),
                 const SizedBox(height: 20),
                 _buildActionButtons(context, authProvider),
-                const SizedBox(height: 20),
-                _buildBiometricFloatingButton(), // Botón flotante en el borde
+                const SizedBox(height: 16),
               ],
             ),
           );
@@ -167,18 +254,35 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
-  Widget _buildHeader(dynamic user, AuthProvider authProvider) {
+  Widget _buildHeader(dynamic user) {
     return Column(
       children: [
-        CircleAvatar(
-          radius: 60,
-          backgroundColor: Colors.blue.shade100,
-          child: Text(
-            _getInitials(user.nombreCompleto),
-            style: TextStyle(
-              fontSize: 40,
-              fontWeight: FontWeight.bold,
-              color: Colors.blue.shade700,
+        Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [_primaryColor, _secondaryColor],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _primaryColor.withOpacity(0.3),
+                blurRadius: 20,
+                spreadRadius: 5,
+              ),
+            ],
+          ),
+          child: CircleAvatar(
+            radius: 55,
+            backgroundColor: Colors.transparent,
+            child: Text(
+              _getInitials(user.nombreCompleto),
+              style: const TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
@@ -188,20 +292,30 @@ class _PerfilScreenState extends State<PerfilScreen> {
           style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
+            color: _textPrimary,
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.blue.shade50,
+            gradient: LinearGradient(
+              colors: [
+                _primaryColor.withOpacity(0.1),
+                _secondaryColor.withOpacity(0.1)
+              ],
+            ),
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _primaryColor.withOpacity(0.3),
+              width: 1,
+            ),
           ),
           child: Text(
             user.rol.toUpperCase(),
-            style: TextStyle(
-              color: Colors.blue.shade700,
+            style: const TextStyle(
+              color: _primaryColor,
               fontWeight: FontWeight.bold,
               fontSize: 12,
             ),
@@ -212,52 +326,61 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Widget _buildInfoCard(dynamic user, AuthProvider authProvider) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             _buildInfoRow(
-              icon: Icons.email,
+              icon: Icons.email_rounded,
               label: 'Correo electrónico',
               value: user.email,
             ),
-            const Divider(),
+            const Divider(height: 24),
             _buildInfoRow(
-              icon: Icons.badge,
+              icon: Icons.badge_rounded,
               label: 'ID de docente',
               value: user.id.toString(),
             ),
-            const Divider(),
+            const Divider(height: 24),
             _buildInfoRow(
-              icon: Icons.face,
+              icon: Icons.face_retouching_natural_rounded,
               label: 'Registro facial',
               value: authProvider.registroFacialCompleto
                   ? 'Completado'
                   : 'Pendiente',
               valueColor: authProvider.registroFacialCompleto
-                  ? Colors.green
-                  : Colors.orange,
+                  ? _successColor
+                  : _warningColor,
               showIcon: true,
             ),
             if (!authProvider.registroFacialCompleto) ...[
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: authProvider.embeddingsCount / 50,
-                backgroundColor: Colors.grey.shade200,
-                color: Colors.orange,
-                minHeight: 8,
+              const SizedBox(height: 16),
+              ClipRRect(
                 borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: authProvider.embeddingsCount / 50,
+                  backgroundColor: Colors.grey.shade200,
+                  color: _warningColor,
+                  minHeight: 8,
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               Text(
                 'Progreso: ${authProvider.embeddingsCount} de 50 capturas',
                 style: const TextStyle(
-                  color: Colors.grey,
+                  color: _textSecondary,
                   fontSize: 13,
                 ),
               ),
@@ -268,14 +391,35 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
-  // Tarjeta de biometría en el medio de la pantalla
-  Widget _buildBiometricCard(AuthProvider authProvider) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+  Widget _buildBiometricCard() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: _biometricEnabled
+              ? [
+                  _successColor.withOpacity(0.1),
+                  _successColor.withOpacity(0.05)
+                ]
+              : [
+                  _warningColor.withOpacity(0.1),
+                  _warningColor.withOpacity(0.05)
+                ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _biometricEnabled
+              ? _successColor.withOpacity(0.3)
+              : _warningColor.withOpacity(0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      elevation: 4,
-      color: _biometricEnabled ? Colors.green.shade50 : Colors.orange.shade50,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -283,37 +427,44 @@ class _PerfilScreenState extends State<PerfilScreen> {
           children: [
             Row(
               children: [
-                Icon(
-                  _biometricEnabled
-                      ? Icons.fingerprint
-                      : Icons.fingerprint_outlined,
-                  size: 32,
-                  color: _biometricEnabled ? Colors.green : Colors.orange,
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (_biometricEnabled ? _successColor : _warningColor)
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    _biometricEnabled
+                        ? Icons.fingerprint_rounded
+                        : Icons.fingerprint_outlined,
+                    size: 32,
+                    color: _biometricEnabled ? _successColor : _warningColor,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Autenticación Biométrica',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: _biometricEnabled
-                              ? Colors.green.shade800
-                              : Colors.orange.shade800,
+                          color: _textPrimary,
                         ),
                       ),
+                      const SizedBox(height: 4),
                       Text(
                         _biometricEnabled
-                            ? 'Protegido con huella o reconocimiento facial'
+                            ? 'Protegido con huella digital'
                             : 'Habilita para mayor seguridad',
                         style: TextStyle(
                           fontSize: 14,
                           color: _biometricEnabled
-                              ? Colors.green.shade600
-                              : Colors.orange.shade600,
+                              ? _successColor
+                              : _textSecondary,
                         ),
                       ),
                     ],
@@ -326,25 +477,21 @@ class _PerfilScreenState extends State<PerfilScreen> {
               children: [
                 Expanded(
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: _biometricEnabled
-                          ? Colors.green.shade200
-                          : Colors.orange.shade200,
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           _biometricEnabled
-                              ? Icons.check_circle
-                              : Icons.warning,
+                              ? Icons.check_circle_rounded
+                              : Icons.info_rounded,
                           size: 20,
-                          color: _biometricEnabled
-                              ? Colors.green.shade800
-                              : Colors.orange.shade800,
+                          color:
+                              _biometricEnabled ? _successColor : _warningColor,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -352,8 +499,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: _biometricEnabled
-                                ? Colors.green.shade800
-                                : Colors.orange.shade800,
+                                ? _successColor
+                                : _warningColor,
                           ),
                         ),
                       ],
@@ -363,18 +510,19 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 const SizedBox(width: 12),
                 if (_isLoading)
                   const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: _primaryColor),
                   )
                 else
                   Switch(
                     value: _biometricEnabled,
                     onChanged: _isBiometricAvailable
-                        ? (_) => _habilitarBiometria()
+                        ? (value) => _toggleBiometria(value)
                         : null,
-                    activeColor: Colors.green,
-                    activeTrackColor: Colors.green.shade300,
+                    activeColor: _successColor,
+                    activeTrackColor: _successColor.withOpacity(0.3),
                     inactiveThumbColor: Colors.grey,
                     inactiveTrackColor: Colors.grey.shade300,
                   ),
@@ -383,19 +531,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
             if (!_isBiometricAvailable) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade100,
-                  borderRadius: BorderRadius.circular(8),
+                  color: _dangerColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.red),
-                    SizedBox(width: 8),
+                    Icon(Icons.info_outline_rounded,
+                        size: 18, color: _dangerColor),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Este dispositivo no soporta autenticación biométrica',
-                        style: TextStyle(fontSize: 12, color: Colors.red),
+                        style: TextStyle(fontSize: 13, color: _dangerColor),
                       ),
                     ),
                   ],
@@ -408,47 +557,63 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
-  Widget _buildSecuritySection(AuthProvider authProvider) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+  Widget _buildSecuritySection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.security, color: Colors.blue.shade700),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.security_rounded,
+                      color: _primaryColor, size: 24),
+                ),
+                const SizedBox(width: 12),
                 const Text(
                   'Seguridad',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: _textPrimary,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             _buildInfoRow(
-              icon: Icons.verified_user,
+              icon: Icons.verified_user_rounded,
               label: 'Estado de seguridad',
               value: _biometricEnabled && _isBiometricAvailable
                   ? 'Protegido'
                   : 'Básico',
               valueColor: _biometricEnabled && _isBiometricAvailable
-                  ? Colors.green
-                  : Colors.orange,
+                  ? _successColor
+                  : _warningColor,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             _buildInfoRow(
-              icon: Icons.info_outline,
+              icon: Icons.info_outline_rounded,
               label: 'Biometría disponible',
-              value: _isBiometricAvailable ? 'Si' : 'No',
-              valueColor: _isBiometricAvailable ? Colors.green : Colors.red,
+              value: _isBiometricAvailable ? 'Sí' : 'No',
+              valueColor: _isBiometricAvailable ? _successColor : _dangerColor,
             ),
           ],
         ),
@@ -457,48 +622,62 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Widget _buildActionsSection(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.settings, color: Colors.blue.shade700),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.settings_rounded,
+                      color: _primaryColor, size: 24),
+                ),
+                const SizedBox(width: 12),
                 const Text(
                   'Opciones',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: _textPrimary,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             _buildActionOption(
-              icon: Icons.help_outline,
+              icon: Icons.help_outline_rounded,
               label: 'Guía de uso',
-              color: Colors.blue,
+              color: _infoColor,
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const GuiaDemoScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const GuiaDemoScreen()),
                 );
               },
             ),
-            const Divider(),
+            const Divider(height: 24),
             _buildActionOption(
-              icon: Icons.shield,
+              icon: Icons.privacy_tip_rounded,
               label: 'Política de privacidad',
-              color: Colors.grey,
+              color: _textSecondary,
               onTap: () {
                 _mostrarDialogo(
                   context,
@@ -507,11 +686,11 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 );
               },
             ),
-            const Divider(),
+            const Divider(height: 24),
             _buildActionOption(
-              icon: Icons.info_outline,
+              icon: Icons.info_outline_rounded,
               label: 'Versión de la aplicación',
-              color: Colors.grey,
+              color: _textSecondary,
               onTap: () {
                 _mostrarDialogo(
                   context,
@@ -531,67 +710,34 @@ class _PerfilScreenState extends State<PerfilScreen> {
       children: [
         if (!authProvider.registroFacialCompleto)
           _buildActionButton(
-            context,
-            icon: Icons.face,
+            icon: Icons.face_retouching_natural_rounded,
             label: 'Completar Registro Facial',
-            color: Colors.orange,
+            color: _warningColor,
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const RegistroFacialScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const RegistroFacialScreen()),
               );
             },
           ),
         _buildActionButton(
-          context,
-          icon: Icons.lock,
+          icon: Icons.lock_reset_rounded,
           label: 'Cambiar Contraseña',
-          color: Colors.blue,
+          color: _primaryColor,
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const CambioPasswordScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const CambioPasswordScreen()),
             );
           },
         ),
         _buildActionButton(
-          context,
-          icon: Icons.logout,
+          icon: Icons.logout_rounded,
           label: 'Cerrar Sesión',
-          color: Colors.red,
+          color: _dangerColor,
           onTap: () => _cerrarSesion(context),
         ),
       ],
-    );
-  }
-
-  // Botón flotante de biometría en el borde inferior
-  Widget _buildBiometricFloatingButton() {
-    if (!_isBiometricAvailable) {
-      return const SizedBox.shrink();
-    }
-
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: FloatingActionButton.extended(
-          onPressed: _habilitarBiometria,
-          backgroundColor: _biometricEnabled ? Colors.green : Colors.blue,
-          icon: Icon(
-            _biometricEnabled ? Icons.fingerprint : Icons.fingerprint_outlined,
-            color: Colors.white,
-          ),
-          label: Text(
-            _biometricEnabled ? 'Biometría activa' : 'Activar biometría',
-            style: const TextStyle(color: Colors.white),
-          ),
-        ),
-      ),
     );
   }
 
@@ -601,14 +747,29 @@ class _PerfilScreenState extends State<PerfilScreen> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(label),
-      trailing:
-          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+    return InkWell(
       onTap: onTap,
-      contentPadding: EdgeInsets.zero,
-      dense: true,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: _textPrimary,
+                ),
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                size: 16, color: Colors.grey),
+          ],
+        ),
+      ),
     );
   }
 
@@ -619,51 +780,58 @@ class _PerfilScreenState extends State<PerfilScreen> {
     Color? valueColor,
     bool showIcon = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
-                ),
-                Row(
-                  children: [
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: valueColor,
-                      ),
-                    ),
-                    if (showIcon && value == 'Completado')
-                      const SizedBox(width: 4),
-                    if (showIcon && value == 'Completado')
-                      Icon(Icons.check_circle, size: 16, color: Colors.green),
-                    if (showIcon && value == 'Pendiente')
-                      Icon(Icons.warning, size: 16, color: Colors.orange),
-                  ],
-                ),
-              ],
-            ),
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
-      ),
+          child: Icon(icon, size: 18, color: _textSecondary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: _textSecondary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: valueColor ?? _textPrimary,
+                    ),
+                  ),
+                  if (showIcon && value == 'Completado') ...[
+                    const SizedBox(width: 4),
+                    Icon(Icons.check_circle_rounded,
+                        size: 16, color: _successColor),
+                  ],
+                  if (showIcon && value == 'Pendiente') ...[
+                    const SizedBox(width: 4),
+                    Icon(Icons.warning_rounded, size: 16, color: _warningColor),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildActionButton(
-    BuildContext context, {
+  Widget _buildActionButton({
     required IconData icon,
     required String label,
     required Color color,
@@ -673,18 +841,35 @@ class _PerfilScreenState extends State<PerfilScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: SizedBox(
         width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: onTap,
-          icon: Icon(icon, color: color),
-          label: Text(
-            label,
-            style: TextStyle(color: color),
-          ),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            side: BorderSide(color: color.withAlpha(128)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: color.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: color, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -697,14 +882,21 @@ class _PerfilScreenState extends State<PerfilScreen> {
     if (partes.length >= 2) {
       return '${partes[0][0]}${partes[1][0]}'.toUpperCase();
     }
-    return nombre[0].toUpperCase();
+    return nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
   }
 
   Future<void> _cerrarSesion(BuildContext context) async {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cerrar sesión'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.logout_rounded, color: _dangerColor, size: 28),
+            const SizedBox(width: 12),
+            const Text('Cerrar sesión'),
+          ],
+        ),
         content: const Text('¿Estás seguro de cerrar sesión?'),
         actions: [
           TextButton(
@@ -713,8 +905,10 @@ class _PerfilScreenState extends State<PerfilScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: _dangerColor,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Cerrar sesión'),
@@ -738,6 +932,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(titulo),
         content: Text(mensaje),
         actions: [

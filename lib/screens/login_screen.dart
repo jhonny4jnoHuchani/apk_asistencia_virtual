@@ -54,6 +54,12 @@ class _LoginScreenState extends State<LoginScreen>
 
   final LocalAuthentication _localAuth = LocalAuthentication();
 
+  // Claves para SharedPreferences
+  static const String _biometricPrefKey = 'biometric_enabled';
+  static const String _biometricEmailKey = 'biometric_email';
+  static const String _biometricPasswordKey = 'biometric_password';
+  static const String _biometricUserIdKey = 'biometric_user_id';
+
   @override
   void initState() {
     super.initState();
@@ -85,25 +91,30 @@ class _LoginScreenState extends State<LoginScreen>
       final isDeviceSupported = await _localAuth.isDeviceSupported();
       final enrolled = await _localAuth.getAvailableBiometrics();
 
-      setState(() {
-        _biometricAvailable =
-            isAvailable && isDeviceSupported && enrolled.isNotEmpty;
-      });
+      final biometricAvailable =
+          isAvailable && isDeviceSupported && enrolled.isNotEmpty;
 
-      if (_biometricAvailable) {
-        final prefs = await SharedPreferences.getInstance();
-        final userId = prefs.getString('biometric_user_id');
-        if (userId != null && userId.isNotEmpty) {
-          setState(() {
-            _biometricEnabled = true;
-          });
-        }
+      // Verificar si la biometría está habilitada desde el perfil
+      final prefs = await SharedPreferences.getInstance();
+      final biometricEnabled = prefs.getBool(_biometricPrefKey) ?? false;
+      final hasCredentials = prefs.getString(_biometricEmailKey) != null &&
+          prefs.getString(_biometricEmailKey)!.isNotEmpty;
+
+      if (mounted) {
+        setState(() {
+          _biometricAvailable = biometricAvailable;
+          _biometricEnabled =
+              biometricAvailable && biometricEnabled && hasCredentials;
+        });
       }
     } catch (e) {
-      setState(() {
-        _biometricAvailable = false;
-        _biometricEnabled = false;
-      });
+      print('Error al verificar biometría: $e');
+      if (mounted) {
+        setState(() {
+          _biometricAvailable = false;
+          _biometricEnabled = false;
+        });
+      }
     }
   }
 
@@ -122,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen>
         });
       }
     } catch (e) {
-      // Ignorar errores
+      print('Error al cargar credenciales: $e');
     }
   }
 
@@ -139,14 +150,31 @@ class _LoginScreenState extends State<LoginScreen>
         await prefs.setBool('remember_me', false);
       }
     } catch (e) {
-      // Ignorar errores
+      print('Error al guardar credenciales: $e');
+    }
+  }
+
+  Future<void> _guardarCredencialesBiometricas(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_biometricEmailKey, _emailController.text.trim());
+      await prefs.setString(_biometricPasswordKey, _passwordController.text);
+      await prefs.setString(_biometricUserIdKey, userId);
+    } catch (e) {
+      print('Error al guardar credenciales biométricas: $e');
     }
   }
 
   Future<void> _loginConBiometria() async {
-    if (!_biometricAvailable || !_biometricEnabled) {
+    if (!_biometricAvailable) {
       _mostrarMensaje(
-        'Biometría no disponible o no configurada',
+          'Biometría no disponible en este dispositivo', Colors.orange);
+      return;
+    }
+
+    if (!_biometricEnabled) {
+      _mostrarMensaje(
+        'Habilita la biometría en tu perfil primero',
         Colors.orange,
       );
       return;
@@ -155,23 +183,18 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isBiometricLoading = true);
 
     try {
+      // Autenticar con biometría
       final authenticated = await _localAuth.authenticate(
-        localizedReason: 'Verifica tu identidad para iniciar sesión',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: true,
-        ),
+        localizedReason: 'Inicia sesión con tu huella digital',
       );
 
-      if (!mounted) {
-        setState(() => _isBiometricLoading = false);
-        return;
-      }
+      if (!mounted) return;
 
       if (authenticated) {
+        // Obtener credenciales guardadas
         final prefs = await SharedPreferences.getInstance();
-        final email = prefs.getString('biometric_email');
-        final password = prefs.getString('biometric_password');
+        final email = prefs.getString(_biometricEmailKey);
+        final password = prefs.getString(_biometricPasswordKey);
 
         if (email != null &&
             password != null &&
@@ -179,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen>
             password.isNotEmpty) {
           _emailController.text = email;
           _passwordController.text = password;
-          await _login();
+          await _login(skipValidation: true);
         } else {
           setState(() => _isBiometricLoading = false);
           _mostrarMensaje(
@@ -189,26 +212,17 @@ class _LoginScreenState extends State<LoginScreen>
         }
       } else {
         setState(() => _isBiometricLoading = false);
-        _mostrarMensaje(
-          'Autenticación biométrica fallida',
-          Colors.red,
-        );
+        _mostrarMensaje('Autenticación biométrica fallida', Colors.red);
       }
     } catch (e) {
+      print('Error en autenticación biométrica: $e');
       setState(() => _isBiometricLoading = false);
-      _mostrarMensaje(
-        'Error al autenticar con biometría: $e',
-        Colors.red,
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isBiometricLoading = false);
-      }
+      _mostrarMensaje('Error al autenticar con biometría', Colors.red);
     }
   }
 
-  Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _login({bool skipValidation = false}) async {
+    if (!skipValidation && !_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
@@ -221,23 +235,27 @@ class _LoginScreenState extends State<LoginScreen>
     if (!mounted) return;
 
     setState(() => _isLoading = false);
+    setState(() => _isBiometricLoading = false);
 
     if (success) {
       await _guardarCredenciales();
 
       // Guardar credenciales para biometría si está habilitada
-      if (_biometricEnabled) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('biometric_email', _emailController.text.trim());
-        await prefs.setString('biometric_password', _passwordController.text);
-        await prefs.setString(
-            'biometric_user_id', authProvider.user?.id.toString() ?? '');
+      final prefs = await SharedPreferences.getInstance();
+      final biometricEnabled = prefs.getBool(_biometricPrefKey) ?? false;
+
+      if (biometricEnabled) {
+        await _guardarCredencialesBiometricas(
+          authProvider.user?.id.toString() ?? '',
+        );
       }
 
       _navigateToNextScreen();
     } else {
       _mostrarMensaje(
-          authProvider.error ?? 'Error al iniciar sesión', Colors.red);
+        authProvider.error ?? 'Error al iniciar sesión',
+        Colors.red,
+      );
     }
   }
 
@@ -245,8 +263,6 @@ class _LoginScreenState extends State<LoginScreen>
     final authProvider = context.read<AuthProvider>();
 
     if (authProvider.necesitaCambiarPassword) {
-      // ← Aquí se evalúa
-      // Abre CambioPasswordScreen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const CambioPasswordScreen()),
@@ -319,40 +335,27 @@ class _LoginScreenState extends State<LoginScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ─── LOGO ────────────────────────────────────
                     _buildLogo(),
                     const SizedBox(height: 32),
-
-                    // ─── TÍTULO Y SUBTÍTULO ─────────────────────
                     _buildHeader(),
                     const SizedBox(height: 40),
-
-                    // ─── CARD DE LOGIN ──────────────────────────
                     _buildLoginCard(),
                     const SizedBox(height: 20),
-
-                    // ─── OPCIONES ───────────────────────────────
                     _buildOptionsRow(),
                     const SizedBox(height: 28),
-
-                    // ─── BOTÓN PRINCIPAL ────────────────────────
                     _buildLoginButton(),
-                    const SizedBox(height: 16),
 
-                    // ─── BOTÓN BIOMÉTRICO ──────────────────────
-                    if (_biometricAvailable && _biometricEnabled)
+                    // Botón biométrico - solo si está habilitado
+                    if (_biometricAvailable && _biometricEnabled) ...[
+                      const SizedBox(height: 16),
                       _buildBiometricButton(),
-                    const SizedBox(height: 20),
+                    ],
 
-                    // ─── DIVIDER ────────────────────────────────
+                    const SizedBox(height: 20),
                     _buildDivider(),
                     const SizedBox(height: 20),
-
-                    // ─── BOTONES SOCIALES ───────────────────────
                     _buildSocialButtons(),
                     const SizedBox(height: 28),
-
-                    // ─── FOOTER ─────────────────────────────────
                     _buildFooter(),
                   ],
                 ),
@@ -364,8 +367,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── WIDGETS ────────────────────────────────────────────────
-
   Widget _buildLogo() {
     return Center(
       child: Hero(
@@ -373,7 +374,6 @@ class _LoginScreenState extends State<LoginScreen>
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Glow animado
             AnimatedContainer(
               duration: const Duration(seconds: 3),
               height: 130,
@@ -390,7 +390,6 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
             ),
-            // Círculo principal con gradiente
             Container(
               height: 96,
               width: 96,
@@ -399,12 +398,7 @@ class _LoginScreenState extends State<LoginScreen>
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    neonCyan,
-                    neonBlue,
-                    neonPurple,
-                    neonPink,
-                  ],
+                  colors: [neonCyan, neonBlue, neonPurple, neonPink],
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -564,11 +558,7 @@ class _LoginScreenState extends State<LoginScreen>
       children: [
         Row(
           children: [
-            Icon(
-              icon,
-              color: textSecondary,
-              size: 20,
-            ),
+            Icon(icon, color: textSecondary, size: 20),
             const SizedBox(width: 10),
             Text(
               label,
@@ -614,17 +604,11 @@ class _LoginScreenState extends State<LoginScreen>
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: secondary,
-                width: 2,
-              ),
+              borderSide: BorderSide(color: secondary, width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: errorColor,
-                width: 1.5,
-              ),
+              borderSide: BorderSide(color: errorColor, width: 1.5),
             ),
             filled: true,
             fillColor: background,
@@ -665,10 +649,7 @@ class _LoginScreenState extends State<LoginScreen>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(6),
             ),
-            side: BorderSide(
-              color: borderColor,
-              width: 2,
-            ),
+            side: BorderSide(color: borderColor, width: 2),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),
@@ -709,7 +690,7 @@ class _LoginScreenState extends State<LoginScreen>
     return SizedBox(
       height: 58,
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _login,
+        onPressed: _isLoading ? null : () => _login(),
         style: ElevatedButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: Colors.white,
@@ -731,14 +712,10 @@ class _LoginScreenState extends State<LoginScreen>
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.login_rounded,
-                    size: 24,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
+                children: const [
+                  Icon(Icons.login_rounded, size: 24, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text(
                     'Iniciar Sesión',
                     style: TextStyle(
                       fontSize: 17,
@@ -758,10 +735,7 @@ class _LoginScreenState extends State<LoginScreen>
       child: OutlinedButton(
         onPressed: _isBiometricLoading ? null : _loginConBiometria,
         style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: secondary.withOpacity(0.3),
-            width: 1.5,
-          ),
+          side: BorderSide(color: secondary.withOpacity(0.3), width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -805,12 +779,7 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildDivider() {
     return Row(
       children: [
-        Expanded(
-          child: Container(
-            height: 1.5,
-            color: borderColor,
-          ),
-        ),
+        Expanded(child: Container(height: 1.5, color: borderColor)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
@@ -823,12 +792,7 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ),
-        Expanded(
-          child: Container(
-            height: 1.5,
-            color: borderColor,
-          ),
-        ),
+        Expanded(child: Container(height: 1.5, color: borderColor)),
       ],
     );
   }
@@ -849,14 +813,12 @@ class _LoginScreenState extends State<LoginScreen>
         Expanded(
           child: _buildSocialButton(
             icon: Icon(
-              Platform.isIOS ? Icons.face_rounded : Icons.fingerprint,
-              color: _biometricAvailable && _biometricEnabled
-                  ? secondary
-                  : textSecondary,
+              Icons.fingerprint,
+              color: _biometricAvailable ? secondary : textSecondary,
               size: 26,
             ),
-            label: Platform.isIOS ? 'Face ID' : 'Huella',
-            onPressed: _biometricAvailable && _biometricEnabled
+            label: 'Huella',
+            onPressed: _biometricAvailable
                 ? _loginConBiometria
                 : () {
                     _mostrarMensaje(
@@ -882,10 +844,7 @@ class _LoginScreenState extends State<LoginScreen>
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: borderColor,
-            width: 1.5,
-          ),
+          side: BorderSide(color: borderColor, width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),

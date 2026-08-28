@@ -1,61 +1,87 @@
+// widgets/home/home_app_bar.dart
 import 'package:flutter/material.dart';
 
 class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final VoidCallback onHelp;
   final VoidCallback onRegistroFacial;
   final VoidCallback onHistorial;
   final VoidCallback onPerfil;
   final VoidCallback onLogout;
+  final VoidCallback? onHelp;
 
   const HomeAppBar({
     super.key,
-    required this.onHelp,
     required this.onRegistroFacial,
     required this.onHistorial,
     required this.onPerfil,
     required this.onLogout,
+    this.onHelp,
   });
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
       title: const Text(
-        'Mis Horarios',
+        'Control Docente',
         style: TextStyle(
           fontWeight: FontWeight.bold,
+          fontSize: 18,
           color: Color(0xFF2D3436),
         ),
       ),
-      centerTitle: true,
       backgroundColor: Colors.white,
-      foregroundColor: Color(0xFF2D3436),
+      foregroundColor: const Color(0xFF2D3436),
       elevation: 0,
+      centerTitle: true,
       actions: [
+        // Botón de ayuda (solo si onHelp no es null)
+        if (onHelp != null)
+          IconButton(
+            onPressed: onHelp,
+            icon: Icon(
+              Icons.help_outline_rounded,
+              color: Colors.grey.shade600,
+              size: 24,
+            ),
+          ),
+        // Botón de registro facial
         IconButton(
-          icon: const Icon(Icons.help_outline_rounded),
-          tooltip: 'Ver guía de uso',
-          onPressed: onHelp,
-        ),
-        IconButton(
-          icon: const Icon(Icons.face_retouching_natural_rounded),
-          tooltip: 'Registro Facial',
           onPressed: onRegistroFacial,
+          icon: Icon(
+            Icons.face_rounded,
+            color: const Color(0xFF5B67CA),
+            size: 24,
+          ),
+          tooltip: 'Registro Facial',
         ),
+        // Botón de historial
         IconButton(
-          icon: const Icon(Icons.history_rounded),
-          tooltip: 'Historial',
           onPressed: onHistorial,
+          icon: Icon(
+            Icons.history_rounded,
+            color: Colors.grey.shade700,
+            size: 24,
+          ),
+          tooltip: 'Historial',
         ),
+        // Botón de perfil
         IconButton(
-          icon: const Icon(Icons.person_rounded),
-          tooltip: 'Perfil',
           onPressed: onPerfil,
+          icon: Icon(
+            Icons.person_rounded,
+            color: Colors.grey.shade700,
+            size: 24,
+          ),
+          tooltip: 'Perfil',
         ),
+        // Botón de logout
         IconButton(
-          icon: const Icon(Icons.logout_rounded),
-          tooltip: 'Cerrar sesión',
           onPressed: onLogout,
-          color: Colors.red.shade400,
+          icon: Icon(
+            Icons.logout_rounded,
+            color: Colors.red.shade400,
+            size: 24,
+          ),
+          tooltip: 'Cerrar sesión',
         ),
       ],
     );
