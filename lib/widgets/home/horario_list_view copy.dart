@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/horario.dart';
-import 'horario_card_extended.dart';
+import '../horario_card.dart';
 
 class HorarioListView extends StatelessWidget {
   final List<Horario> horarios;
@@ -27,7 +27,7 @@ class HorarioListView extends StatelessWidget {
         itemCount: horarios.length,
         itemBuilder: (context, index) {
           final horario = horarios[index];
-          return HorarioCardExtended(
+          return HorarioCard(
             horario: horario,
             onMarcarEntrada: () => onMarcarEntrada(horario.id),
             onMarcarSalida: () => onMarcarSalida(horario.id),

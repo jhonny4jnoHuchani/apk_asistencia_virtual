@@ -12,7 +12,7 @@ import '../providers/auth_provider.dart';
 import '../providers/horario_provider.dart';
 import '../services/marcado_service.dart';
 import '../services/biometric_service.dart';
-import '../widgets/horario_card.dart';
+// import '../widgets/horario_card.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/home/home_app_bar.dart';
 import '../widgets/home/horario_list_view.dart';

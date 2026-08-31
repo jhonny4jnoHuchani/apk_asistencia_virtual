@@ -14,7 +14,6 @@ class HistorialScreen extends StatefulWidget {
 class _HistorialScreenState extends State<HistorialScreen> {
   final MarcadoService _marcadoService = MarcadoService();
   List<Marcado> _marcados = [];
-  List<GrupoMarcado> _grupos = [];
   bool _isLoading = true;
   String? _error;
 
@@ -34,7 +33,6 @@ class _HistorialScreenState extends State<HistorialScreen> {
   static const Color _successColor = Color(0xFF00B894);
   static const Color _warningColor = Color(0xFFFDCB6E);
   static const Color _dangerColor = Color(0xFFE17055);
-  static const Color _cardShadowColor = Color(0x1A5B67CA);
 
   @override
   void initState() {
@@ -70,11 +68,8 @@ class _HistorialScreenState extends State<HistorialScreen> {
       );
 
       if (mounted) {
-        // Agrupar los marcados por horario
-        final grupos = _agruparPorHorario(resultado);
         setState(() {
           _marcados = resultado;
-          _grupos = grupos;
           _isLoading = false;
         });
       }
@@ -86,36 +81,6 @@ class _HistorialScreenState extends State<HistorialScreen> {
         });
       }
     }
-  }
-
-  List<GrupoMarcado> _agruparPorHorario(List<Marcado> marcados) {
-    final Map<String, GrupoMarcado> gruposMap = {};
-
-    for (final marcado in marcados) {
-      final key =
-          '${marcado.materia}_${marcado.paralelo}_${marcado.fecha.toIso8601String().split('T')[0]}';
-
-      if (!gruposMap.containsKey(key)) {
-        gruposMap[key] = GrupoMarcado(
-          materia: marcado.materia,
-          paralelo: marcado.paralelo,
-          fecha: marcado.fecha,
-          ubicacion: marcado.ubicacion,
-          entrada: null,
-          salida: null,
-        );
-      }
-
-      final grupo = gruposMap[key]!;
-      if (marcado.tipo == 'entrada') {
-        grupo.entrada = marcado;
-      } else if (marcado.tipo == 'salida') {
-        grupo.salida = marcado;
-      }
-    }
-
-    return gruposMap.values.toList()
-      ..sort((a, b) => b.fecha.compareTo(a.fecha));
   }
 
   Future<void> _seleccionarFecha() async {
@@ -160,7 +125,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
       builder: (context) {
         return Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -175,31 +140,14 @@ class _HistorialScreenState extends State<HistorialScreen> {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Seleccionar mes',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: _textPrimary,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: _primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.date_range_rounded,
-                        color: _primaryColor,
-                        size: 20,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 24),
+                const Text(
+                  'Seleccionar mes',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: _textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 GridView.count(
@@ -212,39 +160,24 @@ class _HistorialScreenState extends State<HistorialScreen> {
                     final mesNombre = DateFormat('MMM', 'es').format(
                       DateTime(2024, mesNum, 1),
                     );
-                    final isSelected = _filtroMes == mesNum;
                     return Material(
-                      color: isSelected ? _primaryColor : Colors.grey.shade100,
+                      color: _filtroMes == mesNum
+                          ? _primaryColor
+                          : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                       child: InkWell(
                         onTap: () => Navigator.of(context).pop(mesNum),
                         borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                mesNombre.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color:
-                                      isSelected ? Colors.white : _textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                width: 4,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.transparent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ],
+                        child: Center(
+                          child: Text(
+                            mesNombre.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _filtroMes == mesNum
+                                  ? Colors.white
+                                  : _textPrimary,
+                            ),
                           ),
                         ),
                       ),
@@ -311,78 +244,44 @@ class _HistorialScreenState extends State<HistorialScreen> {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _cardShadowColor,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [_primaryColor, _secondaryColor],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.history_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 'Historial',
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: _textPrimary,
                 ),
               ),
+              const SizedBox(height: 4),
               Text(
-                _grupos.isNotEmpty
-                    ? '${_grupos.length} registros agrupados'
+                _marcados.isNotEmpty
+                    ? '${_marcados.length} registros'
                     : 'Sin registros',
-                style: TextStyle(
-                  fontSize: 13,
+                style: const TextStyle(
+                  fontSize: 14,
                   color: _textSecondary,
                 ),
               ),
             ],
           ),
-          const Spacer(),
-          if (_grupos.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Total: ${_grupos.length}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _primaryColor,
-                ),
-              ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: const Icon(
+              Icons.history_rounded,
+              color: _primaryColor,
+              size: 28,
+            ),
+          ),
         ],
       ),
     );
@@ -390,14 +289,14 @@ class _HistorialScreenState extends State<HistorialScreen> {
 
   Widget _buildFiltros() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           Expanded(
             child: _buildFilterChip(
               icon: Icons.calendar_today_rounded,
               label: _filtroFecha != null
-                  ? DateFormat('dd MMM yyyy').format(_filtroFecha!)
+                  ? DateFormat('dd MMM').format(_filtroFecha!)
                   : 'Fecha',
               isActive: _filtroFecha != null,
               onPressed: _seleccionarFecha,
@@ -427,14 +326,10 @@ class _HistorialScreenState extends State<HistorialScreen> {
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: _dangerColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
                     child: Icon(
                       Icons.close_rounded,
                       size: 20,
-                      color: _dangerColor,
+                      color: _dangerColor.withOpacity(0.7),
                     ),
                   ),
                 ),
@@ -460,7 +355,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
         onTap: onPressed,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
@@ -481,7 +376,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                     color: isActive ? Colors.white : _textSecondary,
                   ),
@@ -509,7 +404,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
       return _buildErrorState();
     }
 
-    if (_grupos.isEmpty) {
+    if (_marcados.isEmpty) {
       return _buildEmptyState();
     }
 
@@ -520,10 +415,10 @@ class _HistorialScreenState extends State<HistorialScreen> {
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-        itemCount: _grupos.length,
+        itemCount: _marcados.length,
         itemBuilder: (context, index) {
-          final grupo = _grupos[index];
-          return _buildGrupoCard(grupo);
+          final marcado = _marcados[index];
+          return _buildMarcadoCard(marcado);
         },
       ),
     );
@@ -600,14 +495,10 @@ class _HistorialScreenState extends State<HistorialScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 120,
-              height: 120,
+              width: 100,
+              height: 100,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.grey.shade100, Colors.grey.shade50],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: Colors.grey.shade100,
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -620,7 +511,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
             const Text(
               'No hay registros',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: _textPrimary,
               ),
@@ -638,16 +529,12 @@ class _HistorialScreenState extends State<HistorialScreen> {
             ),
             if (_filtroFecha != null || _filtroMes != null) ...[
               const SizedBox(height: 20),
-              ElevatedButton.icon(
+              TextButton.icon(
                 onPressed: _limpiarFiltros,
-                icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
+                icon: const Icon(Icons.filter_alt_off_rounded),
                 label: const Text('Limpiar filtros'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor.withOpacity(0.1),
+                style: TextButton.styleFrom(
                   foregroundColor: _primaryColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                 ),
               ),
             ],
@@ -657,308 +544,241 @@ class _HistorialScreenState extends State<HistorialScreen> {
     );
   }
 
-  Widget _buildGrupoCard(GrupoMarcado grupo) {
-    final fechaFormateada = DateFormat('dd/MM/yyyy').format(grupo.fecha);
-    final tieneEntrada = grupo.entrada != null;
-    final tieneSalida = grupo.salida != null;
-    final completado = tieneEntrada && tieneSalida;
-    final estadoColor = completado ? _successColor : _warningColor;
-    final estadoTexto = completado ? 'Completado' : 'Pendiente';
+  Widget _buildMarcadoCard(Marcado marcado) {
+    final isEntrada = marcado.tipo == 'entrada';
+    final Color color = isEntrada ? _successColor : _warningColor;
+    final icon = isEntrada ? Icons.login_rounded : Icons.logout_rounded;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.only(bottom: 14),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: _cardShadowColor,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(
-          color: completado
-              ? _successColor.withOpacity(0.3)
-              : _warningColor.withOpacity(0.3),
-          width: 1,
-        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header de la tarjeta
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                // Icono según estado
+                // Icono y tipo
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [estadoColor, estadoColor.withOpacity(0.7)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
-                    completado
-                        ? Icons.check_circle_rounded
-                        : Icons.pending_rounded,
-                    color: Colors.white,
-                    size: 24,
+                    icon,
+                    color: color,
+                    size: 22,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        grupo.materia,
+                        marcado.materia,
                         style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                           color: _textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Text(
-                            'Paralelo ${grupo.paralelo}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: _textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            fechaFormateada,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Badge de estado
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: estadoColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        completado
-                            ? Icons.check_circle_rounded
-                            : Icons.pending_rounded,
-                        size: 12,
-                        color: estadoColor,
-                      ),
-                      const SizedBox(width: 4),
                       Text(
-                        estadoTexto,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: estadoColor,
+                        'Paralelo ${marcado.paralelo}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: _textSecondary,
                         ),
                       ),
                     ],
                   ),
                 ),
+                // Badge de tipo
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    isEntrada ? 'Entrada' : 'Salida',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                ),
               ],
             ),
-          ),
-          // Divider
-          Container(
-            height: 1,
-            color: Colors.grey.shade100,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-          ),
-          // Entrada y Salida
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+            const SizedBox(height: 16),
+            Container(
+              height: 1,
+              color: Colors.grey.shade100,
+            ),
+            const SizedBox(height: 12),
+            // Información adicional
+            Row(
               children: [
                 Expanded(
-                  child: _buildMarcadoItem(
-                    tipo: 'Entrada',
-                    marcado: grupo.entrada,
-                    color: _successColor,
-                    icon: Icons.login_rounded,
+                  child: _buildInfoItem(
+                    icon: Icons.calendar_today_rounded,
+                    label: 'Fecha',
+                    value: DateFormat('dd/MM/yyyy').format(marcado.fecha),
                   ),
                 ),
-                const SizedBox(width: 16),
                 Expanded(
-                  child: _buildMarcadoItem(
-                    tipo: 'Salida',
-                    marcado: grupo.salida,
-                    color: _warningColor,
-                    icon: Icons.logout_rounded,
+                  child: _buildInfoItem(
+                    icon: Icons.access_time_rounded,
+                    label: 'Hora',
+                    value: marcado.hora,
                   ),
+                ),
+                Expanded(
+                  child: _buildEstadoAsistencia(marcado),
                 ),
               ],
             ),
-          ),
-          // Ubicación
-          if (grupo.ubicacion != null) ...[
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.location_on_outlined,
-                    size: 14,
-                    color: Colors.grey.shade500,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      grupo.ubicacion!,
+            // Ubicación (si existe)
+            if (marcado.ubicacion != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 14,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      marcado.ubicacion!,
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMarcadoItem({
-    required String tipo,
-    required Marcado? marcado,
-    required Color color,
-    required IconData icon,
-  }) {
-    final bool existe = marcado != null;
-    final String hora = existe ? marcado!.hora : '--:--';
-    final String estado = existe ? marcado!.estadoAsistencia : 'No marcado';
-    final bool esPuntual = existe ? marcado!.esPuntual : false;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: existe ? color.withOpacity(0.05) : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: existe ? color.withOpacity(0.3) : Colors.grey.shade200,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: existe ? color : Colors.grey.shade400,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                tipo,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: existe ? color : Colors.grey.shade400,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                hora,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: existe ? _textPrimary : Colors.grey.shade400,
+                  ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 6),
-          if (existe) ...[
-            Row(
-              children: [
-                Icon(
-                  esPuntual
-                      ? Icons.check_circle_rounded
-                      : Icons.warning_amber_rounded,
-                  size: 12,
-                  color: esPuntual ? _successColor : _warningColor,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  estado,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: esPuntual ? _successColor : _warningColor,
-                  ),
-                ),
-              ],
-            ),
-          ] else ...[
-            Text(
-              'No registrado',
-              style: TextStyle(
-                fontSize: 11,
-                fontStyle: FontStyle.italic,
-                color: Colors.grey.shade500,
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
-}
 
-class GrupoMarcado {
-  String materia;
-  String paralelo;
-  DateTime fecha;
-  String? ubicacion;
-  Marcado? entrada;
-  Marcado? salida;
+  Widget _buildInfoItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey.shade500,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: _textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
-  GrupoMarcado({
-    required this.materia,
-    required this.paralelo,
-    required this.fecha,
-    this.ubicacion,
-    this.entrada,
-    this.salida,
-  });
+  Widget _buildEstadoAsistencia(Marcado marcado) {
+    final Color color = marcado.esPuntual ? _successColor : _warningColor;
+    final icon = marcado.esPuntual
+        ? Icons.check_circle_rounded
+        : Icons.warning_amber_rounded;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Estado',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: color,
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                marcado.estadoAsistencia,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
