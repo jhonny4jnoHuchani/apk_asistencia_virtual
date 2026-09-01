@@ -3,15 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
+import 'home_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String token;
   final String email;
+  final bool fromRegistration;
 
   const ResetPasswordScreen({
     super.key,
-    required this.token,
+    this.token = '',
     required this.email,
+    this.fromRegistration = false,
   });
 
   @override
@@ -35,7 +38,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     super.dispose();
   }
 
-  Future<void> _resetPassword() async {
+  Future<void> _setPassword() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -45,9 +48,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     try {
       final authProvider = context.read<AuthProvider>();
-      final success = await authProvider.resetPassword(
-        email: widget.email,
-        token: widget.token,
+
+      // Usar el nuevo método setPassword
+      final success = await authProvider.setPassword(
         newPassword: _passwordController.text,
         confirmPassword: _confirmPasswordController.text,
       );
@@ -59,9 +62,25 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           _passwordReset = true;
           _isLoading = false;
         });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.fromRegistration
+                  ? 'Contraseña creada exitosamente'
+                  : 'Contraseña restablecida exitosamente',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
       } else {
         setState(() {
-          _error = authProvider.error ?? 'Error al restablecer la contraseña';
+          _error = authProvider.error ?? 'Error al establecer la contraseña';
           _isLoading = false;
         });
       }
@@ -73,26 +92,28 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     }
   }
 
-  void _mostrarMensaje(String mensaje, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(mensaje, style: const TextStyle(color: Colors.white)),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Restablecer Contraseña'),
+        title: Text(
+          widget.fromRegistration
+              ? 'Establecer Contraseña'
+              : 'Restablecer Contraseña',
+        ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.blue.shade700,
         elevation: 0,
+        leading: widget.fromRegistration
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                tooltip: 'Volver al registro',
+              )
+            : null,
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -109,8 +130,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 20),
-
-                // Icono
                 Container(
                   width: 80,
                   height: 80,
@@ -118,17 +137,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     color: Colors.blue.shade100,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.lock_reset,
+                  child: Icon(
+                    widget.fromRegistration
+                        ? Icons.password_rounded
+                        : Icons.lock_reset,
                     color: Colors.blue,
                     size: 40,
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Título
                 Text(
-                  'Nueva Contraseña',
+                  widget.fromRegistration
+                      ? 'Crear Contraseña'
+                      : 'Nueva Contraseña',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -137,9 +158,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-
                 Text(
-                  'Ingresa tu nueva contraseña para restablecer el acceso',
+                  widget.fromRegistration
+                      ? 'Establece una contraseña segura para tu cuenta'
+                      : 'Ingresa tu nueva contraseña para restablecer el acceso',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade600,
@@ -147,8 +169,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-
-                // Email informativo
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -162,7 +182,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       const Icon(Icons.email, size: 16, color: Colors.grey),
                       const SizedBox(width: 8),
                       Text(
-                        'Restableciendo para: ${widget.email}',
+                        widget.fromRegistration
+                            ? 'Creando contraseña para: ${widget.email}'
+                            : 'Restableciendo para: ${widget.email}',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
@@ -173,8 +195,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-
-                // Formulario
                 Card(
                   elevation: 4,
                   shape: RoundedRectangleBorder(
@@ -204,7 +224,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'Contraseña actualizada',
+                                    widget.fromRegistration
+                                        ? 'Contraseña creada'
+                                        : 'Contraseña actualizada',
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -213,7 +235,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Tu contraseña ha sido restablecida correctamente.',
+                                    widget.fromRegistration
+                                        ? 'Tu cuenta ha sido configurada correctamente.'
+                                        : 'Tu contraseña ha sido restablecida correctamente.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: Colors.green.shade600,
@@ -223,12 +247,21 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                   const SizedBox(height: 16),
                                   ElevatedButton(
                                     onPressed: () {
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => const LoginScreen(),
-                                        ),
-                                      );
+                                      if (widget.fromRegistration) {
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => const HomeScreen(),
+                                          ),
+                                        );
+                                      } else {
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => const LoginScreen(),
+                                          ),
+                                        );
+                                      }
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.blue,
@@ -236,14 +269,25 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(10),
                                       ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 32,
+                                        vertical: 14,
+                                      ),
                                     ),
-                                    child: const Text('Ir al inicio de sesión'),
+                                    child: Text(
+                                      widget.fromRegistration
+                                          ? 'Ir a la página principal'
+                                          : 'Ir al inicio de sesión',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                           ] else ...[
-                            // Error
                             if (_error != null)
                               Container(
                                 padding: const EdgeInsets.all(12),
@@ -256,8 +300,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.error_outline,
-                                        color: Colors.red.shade700),
+                                    Icon(
+                                      Icons.error_outline,
+                                      color: Colors.red.shade700,
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -271,16 +317,60 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                   ],
                                 ),
                               ),
-
-                            // Nueva contraseña
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.blue.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Requisitos de la contraseña:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.blue.shade700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    '• Minimo 6 caracteres',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const Text(
+                                    '• Incluir al menos una letra mayuscula',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const Text(
+                                    '• Incluir al menos un numero',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             TextFormField(
                               controller: _passwordController,
                               obscureText: _obscurePassword,
                               decoration: InputDecoration(
                                 labelText: 'Nueva contraseña',
-                                hintText: 'Mínimo 6 caracteres',
-                                prefixIcon: Icon(Icons.lock,
-                                    color: Colors.blue.shade400),
+                                hintText: 'Minimo 6 caracteres',
+                                prefixIcon: Icon(
+                                  Icons.lock,
+                                  color: Colors.blue.shade400,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -292,7 +382,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: Colors.blue.shade400, width: 2),
+                                    color: Colors.blue.shade400,
+                                    width: 2,
+                                  ),
                                 ),
                                 suffixIcon: IconButton(
                                   icon: Icon(
@@ -312,22 +404,28 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                   return 'Ingresa tu nueva contraseña';
                                 }
                                 if (value.length < 6) {
-                                  return 'Mínimo 6 caracteres';
+                                  return 'Minimo 6 caracteres';
+                                }
+                                if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                                  return 'Debe incluir al menos una mayuscula';
+                                }
+                                if (!RegExp(r'[0-9]').hasMatch(value)) {
+                                  return 'Debe incluir al menos un numero';
                                 }
                                 return null;
                               },
                             ),
                             const SizedBox(height: 16),
-
-                            // Confirmar contraseña
                             TextFormField(
                               controller: _confirmPasswordController,
                               obscureText: _obscureConfirmPassword,
                               decoration: InputDecoration(
-                                labelText: 'Confirmar nueva contraseña',
+                                labelText: 'Confirmar contraseña',
                                 hintText: 'Repite tu nueva contraseña',
-                                prefixIcon: Icon(Icons.lock,
-                                    color: Colors.blue.shade400),
+                                prefixIcon: Icon(
+                                  Icons.lock_outline,
+                                  color: Colors.blue.shade400,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -339,7 +437,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                      color: Colors.blue.shade400, width: 2),
+                                    color: Colors.blue.shade400,
+                                    width: 2,
+                                  ),
                                 ),
                                 suffixIcon: IconButton(
                                   icon: Icon(
@@ -365,12 +465,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               },
                             ),
                             const SizedBox(height: 24),
-
-                            // Botón
                             SizedBox(
                               height: 54,
                               child: ElevatedButton(
-                                onPressed: _isLoading ? null : _resetPassword,
+                                onPressed: _isLoading ? null : _setPassword,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.blue.shade700,
                                   foregroundColor: Colors.white,
@@ -387,9 +485,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                           color: Colors.white,
                                         ),
                                       )
-                                    : const Text(
-                                        'Restablecer Contraseña',
-                                        style: TextStyle(
+                                    : Text(
+                                        widget.fromRegistration
+                                            ? 'Crear Contraseña'
+                                            : 'Restablecer Contraseña',
+                                        style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -397,25 +497,24 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-
-                            // Volver al login
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const LoginScreen(),
+                            if (!widget.fromRegistration)
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const LoginScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  'Volver al inicio de sesión',
+                                  style: TextStyle(
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                );
-                              },
-                              child: Text(
-                                'Volver al inicio de sesión',
-                                style: TextStyle(
-                                  color: Colors.blue.shade700,
-                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            ),
                           ],
                         ],
                       ),

@@ -261,48 +261,4 @@ class AuthProvider extends ChangeNotifier {
     }
     return 'device_${DateTime.now().millisecondsSinceEpoch}';
   }
-
-// NUEVO MÉTODO: Establecer contraseña después del registro facial
-  Future<bool> setPassword({
-    required String newPassword,
-    required String confirmPassword,
-  }) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final response = await _authService.setPassword(
-        password: newPassword,
-        passwordConfirmation: confirmPassword,
-      );
-
-      _isLoading = false;
-      notifyListeners();
-
-      if (response['success'] == true) {
-        // Actualizar el usuario local
-        if (_user != null) {
-          _user = User(
-            id: _user!.id,
-            nombreCompleto: _user!.nombreCompleto,
-            email: _user!.email,
-            rol: _user!.rol,
-            primerLogin: false,
-            embeddingsCount: _user!.embeddingsCount,
-            registroFacialCompleto: _user!.registroFacialCompleto,
-          );
-        }
-        return true;
-      } else {
-        _error = response['message'] ?? 'Error al establecer la contraseña';
-        return false;
-      }
-    } catch (e) {
-      _error = e.toString().replaceAll('Exception: ', '');
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
 }

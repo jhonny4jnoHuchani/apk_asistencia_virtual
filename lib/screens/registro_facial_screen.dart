@@ -18,7 +18,7 @@ import '../widgets/stop_button.dart';
 import '../widgets/error_screen.dart';
 import '../widgets/completed_dialog.dart';
 import '../widgets/permission_dialog.dart';
-import 'home_screen.dart';
+import 'reset_password_screen.dart';
 
 class RegistroFacialScreen extends StatefulWidget {
   const RegistroFacialScreen({super.key});
@@ -525,10 +525,17 @@ class _RegistroFacialScreenState extends State<RegistroFacialScreen> {
           calidadPromedio: _calidadPromedio,
           onPressed: () {
             Navigator.pop(context);
-            Navigator.pushAndRemoveUntil(
+            final authProvider = context.read<AuthProvider>();
+            Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const HomeScreen()),
-              (route) => false,
+              MaterialPageRoute(
+                builder: (_) => ResetPasswordScreen(
+                  token: '', // Se obtendrá desde el AuthProvider
+                  email: authProvider.user?.email ?? '',
+                  fromRegistration:
+                      true, // Indica que viene del registro facial
+                ),
+              ),
             );
           },
         ),

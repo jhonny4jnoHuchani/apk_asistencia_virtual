@@ -356,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _generarGestoAleatorio() {
-    final gestos = ['arriba', 'abajo', 'izquierda', 'derecha', 'sonrisa'];
+    final gestos = ['arriba', 'abajo', 'izquierda', 'derecha'];
     final random = DateTime.now().millisecondsSinceEpoch % gestos.length;
     return gestos[random];
   }
@@ -371,8 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return 'Por favor, gire suavemente hacia la izquierda';
       case 'derecha':
         return 'Por favor, gire suavemente hacia la derecha';
-      case 'sonrisa':
-        return 'Por favor, sonría para la cámara';
+
       default:
         return 'Por favor, mire al frente';
     }

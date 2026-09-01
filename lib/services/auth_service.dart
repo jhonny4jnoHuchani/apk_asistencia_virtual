@@ -103,6 +103,27 @@ class AuthService {
     }
   }
 
+  // Establecer contraseña (requiere autenticación)
+  Future<Map<String, dynamic>> setPassword({
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final response = await _apiService.postAuth(
+      ApiConfig.setPassword,
+      {
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Error al establecer la contraseña');
+    }
+  }
+
   // Logout - usa postAuth (protegido)
   Future<void> logout() async {
     try {

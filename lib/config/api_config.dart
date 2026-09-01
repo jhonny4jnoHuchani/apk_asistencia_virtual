@@ -16,6 +16,8 @@ class ApiConfig {
   static const String cambiarPassword = '/auth/cambiar-password';
   static const String perfil = '/auth/perfil';
 
+  static const String setPassword = '/auth/set-password';
+
   // ============================================
   // ENDPOINTS DE RECUPERACION (PUBLICOS)
   // ============================================
