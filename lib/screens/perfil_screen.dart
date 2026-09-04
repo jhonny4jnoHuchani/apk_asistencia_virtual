@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 import '../providers/auth_provider.dart';
 import 'cambio_password_screen.dart';
 import 'registro_facial_screen.dart';
@@ -103,10 +107,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
   // Método principal para alternar biometría
   Future<void> _toggleBiometria(bool value) async {
     if (value) {
-      // Habilitar biometría
       await _habilitarBiometria();
     } else {
-      // Deshabilitar biometría
       await _deshabilitarBiometria();
     }
   }
@@ -123,7 +125,6 @@ class _PerfilScreenState extends State<PerfilScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Autenticar para habilitar
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Confirma tu identidad para habilitar la biometría',
       );
@@ -150,7 +151,6 @@ class _PerfilScreenState extends State<PerfilScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Autenticar para deshabilitar
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Confirma tu identidad para deshabilitar la biometría',
       );
@@ -161,7 +161,6 @@ class _PerfilScreenState extends State<PerfilScreen> {
         _mostrarSnackBar(
             'Biometría deshabilitada correctamente', _successColor);
       } else {
-        // Mantener el estado anterior
         setState(() => _biometricEnabled = true);
         _mostrarSnackBar('No se pudo deshabilitar la biometría', _dangerColor);
       }
@@ -203,6 +202,411 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
+  // ============================================
+  // MÉTODOS PARA FOTO DE PERFIL (ESTILO WHATSAPP)
+  // ============================================
+
+  Future<void> _tomarFoto() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        await _actualizarFoto(File(image.path));
+      }
+    } catch (e) {
+      _mostrarSnackBar('Error al tomar la foto: $e', _dangerColor);
+    }
+  }
+
+  Future<void> _seleccionarFoto() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        await _actualizarFoto(File(image.path));
+      }
+    } catch (e) {
+      _mostrarSnackBar('Error al seleccionar la foto: $e', _dangerColor);
+    }
+  }
+
+  Future<void> _actualizarFoto(File imageFile) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.updateProfilePhoto(imageFile);
+
+      if (success && mounted) {
+        _mostrarSnackBar('Foto de perfil actualizada', _successColor);
+        setState(() {});
+      } else if (mounted) {
+        _mostrarSnackBar(
+          authProvider.error ?? 'Error al actualizar la foto',
+          _dangerColor,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _mostrarSnackBar('Error: $e', _dangerColor);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _eliminarFoto() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Eliminar foto'),
+        content: const Text(
+            '¿Estás seguro de que quieres eliminar tu foto de perfil?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() => _isLoading = true);
+
+      try {
+        final authProvider = context.read<AuthProvider>();
+        final success = await authProvider.deleteProfilePhoto();
+
+        if (success && mounted) {
+          _mostrarSnackBar('Foto eliminada correctamente', _successColor);
+          setState(() {});
+        } else if (mounted) {
+          _mostrarSnackBar(
+            authProvider.error ?? 'Error al eliminar la foto',
+            _dangerColor,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          _mostrarSnackBar('Error: $e', _dangerColor);
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    }
+  }
+
+  void _mostrarOpcionesFoto(BuildContext context) {
+    final hasPhoto = context.read<AuthProvider>().user?.fotoPerfilUrl != null;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Padding(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Foto de perfil',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildOptionSheet(
+                        icon: Icons.camera_alt_rounded,
+                        title: 'Tomar foto',
+                        subtitle: 'Usar la cámara del dispositivo',
+                        onTap: () {
+                          Navigator.pop(context);
+                          _tomarFoto();
+                        },
+                      ),
+                      const Divider(height: 1),
+                      _buildOptionSheet(
+                        icon: Icons.photo_library_rounded,
+                        title: 'Seleccionar de galería',
+                        subtitle: 'Elegir una foto existente',
+                        onTap: () {
+                          Navigator.pop(context);
+                          _seleccionarFoto();
+                        },
+                      ),
+                      if (hasPhoto) ...[
+                        const Divider(height: 1),
+                        _buildOptionSheet(
+                          icon: Icons.visibility_rounded,
+                          title: 'Ver foto',
+                          subtitle: 'Visualizar foto actual',
+                          onTap: () {
+                            Navigator.pop(context);
+                            _mostrarFotoCompleta(context);
+                          },
+                        ),
+                        const Divider(height: 1),
+                        _buildOptionSheet(
+                          icon: Icons.delete_rounded,
+                          title: 'Eliminar foto',
+                          subtitle: 'Quitar la foto de perfil',
+                          isDestructive: true,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _eliminarFoto();
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.grey[100],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOptionSheet({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isDestructive
+                    ? Colors.red.withOpacity(0.1)
+                    : _primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: isDestructive ? Colors.red : _primaryColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: isDestructive ? Colors.red : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostrarFotoCompleta(BuildContext context) {
+    final photoUrl = context.read<AuthProvider>().user?.fotoPerfilUrl;
+
+    if (photoUrl == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey, width: 0.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Foto de perfil',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Imagen
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(
+                    photoUrl,
+                    height: MediaQuery.of(context).size.height * 0.5,
+                    width: double.infinity,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        height: 300,
+                        alignment: Alignment.center,
+                        child: const CircularProgressIndicator(),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 300,
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline_rounded,
+                              size: 48,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Error al cargar la imagen',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================
+  // BUILD
+  // ============================================
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -219,6 +623,14 @@ class _PerfilScreenState extends State<PerfilScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: _textPrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert_rounded),
+            onPressed: () {
+              _mostrarOpcionesFoto(context);
+            },
+          ),
+        ],
       ),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
@@ -234,8 +646,9 @@ class _PerfilScreenState extends State<PerfilScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _buildHeader(user),
-                const SizedBox(height: 20),
+                // HEADER CON FOTO DE PERFIL ESTILO WHATSAPP
+                _buildHeaderWhatsApp(user, authProvider),
+                const SizedBox(height: 24),
                 _buildInfoCard(user, authProvider),
                 const SizedBox(height: 20),
                 _buildBiometricCard(),
@@ -254,39 +667,99 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
-  Widget _buildHeader(dynamic user) {
+  // ============================================
+  // HEADER ESTILO WHATSAPP
+  // ============================================
+
+  Widget _buildHeaderWhatsApp(dynamic user, AuthProvider authProvider) {
+    final hasPhoto =
+        user.fotoPerfilUrl != null && user.fotoPerfilUrl!.isNotEmpty;
+
     return Column(
       children: [
-        Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [_primaryColor, _secondaryColor],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: _primaryColor.withOpacity(0.3),
-                blurRadius: 20,
-                spreadRadius: 5,
+        Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            // Foto de perfil con borde
+            GestureDetector(
+              onTap: () => _mostrarOpcionesFoto(context),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _primaryColor.withOpacity(0.3),
+                    width: 4,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _primaryColor.withOpacity(0.2),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 60,
+                  backgroundColor: Colors.grey[200],
+                  backgroundImage:
+                      hasPhoto ? NetworkImage(user.fotoPerfilUrl!) : null,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        )
+                      : hasPhoto
+                          ? null
+                          : Text(
+                              _getInitials(user.nombreCompleto),
+                              style: const TextStyle(
+                                fontSize: 40,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                              ),
+                            ),
+                ),
               ),
-            ],
-          ),
-          child: CircleAvatar(
-            radius: 55,
-            backgroundColor: Colors.transparent,
-            child: Text(
-              _getInitials(user.nombreCompleto),
-              style: const TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            ),
+
+            // Botón de cámara flotante (estilo WhatsApp)
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _primaryColor.withOpacity(0.4),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _mostrarOpcionesFoto(context),
+                    borderRadius: BorderRadius.circular(30),
+                    child: const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Icon(
+                        Icons.camera_alt_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
         const SizedBox(height: 16),
+
+        // Nombre
         Text(
           user.nombreCompleto,
           style: const TextStyle(
@@ -296,7 +769,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
           ),
           textAlign: TextAlign.center,
         ),
+        const SizedBox(height: 4),
+
+        // Email
+        Text(
+          user.email,
+          style: const TextStyle(
+            fontSize: 14,
+            color: _textSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
+
+        // Badge de rol
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
@@ -318,6 +804,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
               color: _primaryColor,
               fontWeight: FontWeight.bold,
               fontSize: 12,
+            ),
+          ),
+        ),
+
+        // Texto "Toca para cambiar tu foto" (estilo WhatsApp)
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _mostrarOpcionesFoto(context),
+          child: Text(
+            hasPhoto ? 'Toca para cambiar tu foto' : 'Agregar foto de perfil',
+            style: TextStyle(
+              fontSize: 13,
+              color: _primaryColor,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),

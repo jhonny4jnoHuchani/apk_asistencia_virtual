@@ -15,8 +15,13 @@ class ApiConfig {
   static const String logout = '/auth/logout';
   static const String cambiarPassword = '/auth/cambiar-password';
   static const String perfil = '/auth/perfil';
-
   static const String setPassword = '/auth/set-password';
+
+  // ============================================
+  // ENDPOINTS DE FOTO DE PERFIL CORRECTOS
+  // ============================================
+  static const String updateFoto = '/auth/update-foto-perfil';
+  static const String deleteFoto = '/auth/delete-foto-perfil';
 
   // ============================================
   // ENDPOINTS DE RECUPERACION (PUBLICOS)

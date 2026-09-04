@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import '../config/api_config.dart';
 import '../models/user.dart';
 import 'api_service.dart';
@@ -97,7 +98,9 @@ class AuthService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return User.fromJson(data['user'] ?? data);
+      // La respuesta tiene formato { success: true, data: {...} }
+      final userData = data['data'] ?? data;
+      return User.fromJson(userData);
     } else {
       throw Exception('Error al obtener perfil');
     }
@@ -121,6 +124,85 @@ class AuthService {
     } else {
       final error = jsonDecode(response.body);
       throw Exception(error['message'] ?? 'Error al establecer la contraseña');
+    }
+  }
+
+  // ============================================
+  // MÉTODOS PARA FOTO DE PERFIL
+  // ============================================
+
+  /// Actualizar foto de perfil
+  /// POST /api/auth/update-foto
+  /// [imageFile] - Archivo de imagen a subir
+  /// Retorna la respuesta del servidor con la URL de la foto
+  Future<Map<String, dynamic>> updateFoto(File imageFile) async {
+    try {
+      final response = await _apiService.postMultipart(
+        ApiConfig.updateFoto,
+        fields: {},
+        files: {'foto_perfil': imageFile},
+      );
+
+      // Leer el cuerpo de la respuesta
+      final responseBody =
+          await _apiService.getBodyFromStreamedResponse(response);
+
+      print('[AuthService] updateFoto - Status: ${response.statusCode}');
+      print('[AuthService] updateFoto - Response: $responseBody');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (responseBody['success'] == true) {
+          return responseBody;
+        } else {
+          throw Exception(
+              responseBody['message'] ?? 'Error al actualizar la foto');
+        }
+      } else {
+        throw Exception(
+            responseBody['message'] ?? 'Error al actualizar la foto');
+      }
+    } catch (e) {
+      print('[AuthService] Error en updateFoto: $e');
+      rethrow;
+    }
+  }
+
+  /// Eliminar foto de perfil
+  /// DELETE /api/auth/delete-foto
+  /// Retorna la respuesta del servidor
+  Future<Map<String, dynamic>> deleteFoto() async {
+    try {
+      final response = await _apiService.deleteAuth(ApiConfig.deleteFoto);
+
+      print('[AuthService] deleteFoto - Status: ${response.statusCode}');
+      print('[AuthService] deleteFoto - Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return data;
+        } else {
+          throw Exception(data['message'] ?? 'Error al eliminar la foto');
+        }
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Error al eliminar la foto');
+      }
+    } catch (e) {
+      print('[AuthService] Error en deleteFoto: $e');
+      rethrow;
+    }
+  }
+
+  /// Obtener la URL de la foto de perfil del usuario actual
+  /// Este método es útil para actualizar la foto después de subirla
+  Future<String?> getFotoPerfilUrl() async {
+    try {
+      final user = await getPerfil();
+      return user.fotoPerfilUrl;
+    } catch (e) {
+      print('[AuthService] Error al obtener URL de foto: $e');
+      return null;
     }
   }
 

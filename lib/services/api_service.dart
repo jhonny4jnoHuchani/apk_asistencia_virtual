@@ -288,6 +288,22 @@ class ApiService {
     }
   }
 
+  // En ApiService
+
+  /// Helper para obtener el body como Map desde un StreamedResponse
+  Future<Map<String, dynamic>> getBodyFromStreamedResponse(
+      http.StreamedResponse response) async {
+    try {
+      final bytes = await response.stream.toBytes();
+      final body = utf8.decode(bytes);
+      print('[API] StreamedResponse body: $body');
+      return jsonDecode(body);
+    } catch (e) {
+      print('[API] Error al decodificar StreamedResponse: $e');
+      return {};
+    }
+  }
+
   // ============================================
   // MANEJO DE TOKEN
   // ============================================

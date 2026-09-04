@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/horario.dart';
+import 'package:flutter/cupertino.dart';
 
 class HorarioCardExtended extends StatefulWidget {
   final Horario horario;
@@ -35,15 +36,18 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
   double _progreso = 0.0;
   bool _mostrarTemporizadorSalida = false;
 
-  // Constantes de diseño
-  static const Color _primaryColor = Color(0xFF5B67CA);
-  static const Color _secondaryColor = Color(0xFF8B95E0);
-  static const Color _successColor = Color(0xFF00B894);
-  static const Color _warningColor = Color(0xFFFDCB6E);
-  static const Color _dangerColor = Color(0xFFE17055);
-  static const Color _textPrimary = Color(0xFF2D3436);
-  static const Color _textSecondary = Color(0xFF636E72);
-  static const Color _backgroundColor = Color(0xFFF8F9FC);
+  // Colores iOS
+  static const Color _iosBlue = Color.fromARGB(255, 0, 132, 255);
+  static const Color _iosGreen = Color(0xFF34C759);
+  static const Color _iosOrange = Color(0xFFFF9500);
+  static const Color _iosRed = Color(0xFFFF3B30);
+  static const Color _iosYellow = Color(0xFFFFCC00);
+  static const Color _iosGray = Color(0xFF8E8E93);
+  static const Color _iosLightGray = Color(0xFFF2F2F7);
+  static const Color _iosSeparator = Color(0xFFE5E5EA);
+  static const Color _iosBackground = Color(0xFFF2F2F7);
+  static const Color _iosLabel = Color(0xFF000000);
+  static const Color _iosSecondaryLabel = Color(0xFF3C3C43);
 
   @override
   void initState() {
@@ -110,11 +114,9 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
         _tiempoRetrasoEntrada = Duration.zero;
       }
 
-      // Rango para entrada: 30 minutos antes y 50 minutos después
-      final entradaAntes =
-          inicio.subtract(const Duration(minutes: 30)); // 30 minutos antes
-      final entradaDespues =
-          inicio.add(const Duration(minutes: 150)); // 50 minutos después
+      // Rango para entrada: 30 minutos antes y 150 minutos después
+      final entradaAntes = inicio.subtract(const Duration(minutes: 30));
+      final entradaDespues = inicio.add(const Duration(minutes: 150));
 
       _puedeMarcarEntrada = !widget.horario.yaMarcoEntrada &&
           ahora.isAfter(entradaAntes) &&
@@ -124,12 +126,10 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
       // CÁLCULOS PARA SALIDA
       // ============================================
 
-      // Mostrar temporizador de salida solo si ya marcó entrada
       _mostrarTemporizadorSalida =
           widget.horario.yaMarcoEntrada && !widget.horario.yaMarcoSalida;
 
       if (_mostrarTemporizadorSalida) {
-        // Tiempo restante para salida (si es antes)
         if (ahora.isBefore(fin)) {
           _tiempoRestanteSalida = fin.difference(ahora);
           _tiempoRetrasoSalida = Duration.zero;
@@ -177,21 +177,21 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
   Color _getColorEstadoEntrada() {
     if (_tiempoRetrasoEntrada.inMinutes > 0) {
       final minutos = _tiempoRetrasoEntrada.inMinutes;
-      if (minutos < 5) return Colors.orange.shade600;
-      if (minutos < 15) return Colors.deepOrange.shade600;
-      return Colors.red.shade600;
+      if (minutos < 5) return _iosOrange;
+      if (minutos < 15) return Colors.orange.shade700;
+      return _iosRed;
     }
-    return _primaryColor;
+    return _iosBlue;
   }
 
   IconData _getIconoEntrada() {
     if (_tiempoRetrasoEntrada.inMinutes > 0) {
-      return Icons.warning_amber_rounded;
+      return CupertinoIcons.exclamationmark_triangle;
     } else if (_tiempoRestanteEntrada.inMinutes > 0 ||
         _tiempoRestanteEntrada.inSeconds > 0) {
-      return Icons.timer_rounded;
+      return CupertinoIcons.timer;
     }
-    return Icons.check_circle_rounded;
+    return CupertinoIcons.checkmark_circle;
   }
 
   String _getTextoEntrada() {
@@ -223,21 +223,21 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
   Color _getColorEstadoSalida() {
     if (_tiempoRetrasoSalida.inMinutes > 0) {
       final minutos = _tiempoRetrasoSalida.inMinutes;
-      if (minutos < 5) return Colors.orange.shade600;
-      if (minutos < 15) return Colors.deepOrange.shade600;
-      return Colors.red.shade600;
+      if (minutos < 5) return _iosOrange;
+      if (minutos < 15) return Colors.orange.shade700;
+      return _iosRed;
     }
-    return _dangerColor;
+    return _iosRed;
   }
 
   IconData _getIconoSalida() {
     if (_tiempoRetrasoSalida.inMinutes > 0) {
-      return Icons.warning_amber_rounded;
+      return CupertinoIcons.exclamationmark_triangle;
     } else if (_tiempoRestanteSalida.inMinutes > 0 ||
         _tiempoRestanteSalida.inSeconds > 0) {
-      return Icons.timer_rounded;
+      return CupertinoIcons.timer;
     }
-    return Icons.check_circle_rounded;
+    return CupertinoIcons.checkmark_circle;
   }
 
   String _getTextoSaida() {
@@ -264,189 +264,168 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CupertinoCard(
       margin: const EdgeInsets.only(bottom: 14),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      elevation: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0x1A5B67CA),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header con gradiente según estado
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _getColorHeader(),
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header con estilo iOS
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _getColorHeader(),
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.horario.materia,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.horario.materia,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Paralelo ${widget.horario.paralelo}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.white70,
-                          ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Paralelo ${widget.horario.paralelo}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.white70,
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Badge estilo iOS
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    widget.horario.estaCompletado
+                        ? 'Completado'
+                        : widget.horario.yaMarcoEntrada
+                            ? 'En curso'
+                            : 'Pendiente',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                ),
+              ],
+            ),
+          ),
+
+          // Contenido
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Horario y ubicación
+                Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.clock,
+                      size: 16,
+                      color: _iosGray,
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      widget.horario.estaCompletado
-                          ? 'Completado'
-                          : widget.horario.yaMarcoEntrada
-                              ? 'En curso'
-                              : 'Pendiente',
+                    const SizedBox(width: 6),
+                    Text(
+                      '${widget.horario.horaInicio} - ${widget.horario.horaFin}',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        fontSize: 14,
+                        color: _iosSecondaryLabel,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (widget.horario.ubicacion != null) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(
+                              CupertinoIcons.location,
+                              size: 16,
+                              color: _iosGray,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                widget.horario.ubicacion!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: _iosSecondaryLabel,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                // Barra de progreso iOS
+                if (!widget.horario.estaCompletado) ...[
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: _progreso.clamp(0.0, 1.0),
+                      minHeight: 4,
+                      backgroundColor: _iosLightGray,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _progreso > 0.8 ? _iosGreen : _iosBlue,
                       ),
                     ),
                   ),
                 ],
-              ),
-            ),
 
-            // Contenido
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Horario y ubicación
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time_rounded,
-                        size: 16,
-                        color: _textSecondary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${widget.horario.horaInicio} - ${widget.horario.horaFin}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: _textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (widget.horario.ubicacion != null) ...[
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.location_on_rounded,
-                                size: 16,
-                                color: _textSecondary,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  widget.horario.ubicacion!,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: _textSecondary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-
-                  // Barra de progreso
-                  if (!widget.horario.estaCompletado) ...[
-                    const SizedBox(height: 14),
-                    Container(
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: Stack(
-                        children: [
-                          FractionallySizedBox(
-                            widthFactor: _progreso.clamp(0.0, 1.0),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [_primaryColor, _secondaryColor],
-                                ),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  // ============================================
-                  // TEMPORIZADOR DE ENTRADA
-                  // ============================================
-                  if (!widget.horario.yaMarcoEntrada) ...[
-                    const SizedBox(height: 12),
-                    Container(
+                // ============================================
+                // TEMPORIZADOR DE ENTRADA - iOS Style
+                // ============================================
+                if (!widget.horario.yaMarcoEntrada) ...[
+                  const SizedBox(height: 12),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: null,
+                    child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
                         color: _getColorEstadoEntrada().withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: _getColorEstadoEntrada().withOpacity(0.2),
+                          width: 0.5,
                         ),
                       ),
                       child: Row(
@@ -471,17 +450,17 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
-                                vertical: 4,
+                                vertical: 3,
                               ),
                               decoration: BoxDecoration(
                                 color:
                                     _getColorEstadoEntrada().withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 'Tarde',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                   color: _getColorEstadoEntrada(),
                                 ),
@@ -490,23 +469,28 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                         ],
                       ),
                     ),
-                  ],
+                  ),
+                ],
 
-                  // ============================================
-                  // TEMPORIZADOR DE SALIDA
-                  // ============================================
-                  if (_mostrarTemporizadorSalida) ...[
-                    const SizedBox(height: 12),
-                    Container(
+                // ============================================
+                // TEMPORIZADOR DE SALIDA - iOS Style
+                // ============================================
+                if (_mostrarTemporizadorSalida) ...[
+                  const SizedBox(height: 12),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: null,
+                    child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
                         color: _getColorEstadoSalida().withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: _getColorEstadoSalida().withOpacity(0.2),
+                          width: 0.5,
                         ),
                       ),
                       child: Row(
@@ -531,17 +515,17 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
-                                vertical: 4,
+                                vertical: 3,
                               ),
                               decoration: BoxDecoration(
                                 color:
                                     _getColorEstadoSalida().withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 'Tarde',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                   color: _getColorEstadoSalida(),
                                 ),
@@ -550,171 +534,157 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                         ],
                       ),
                     ),
-                  ],
-
-                  const SizedBox(height: 16),
-
-                  // ============================================
-                  // BOTONES
-                  // ============================================
-                  Row(
-                    children: [
-                      // Botón Entrada
-                      if (!widget.horario.yaMarcoEntrada)
-                        Expanded(
-                          child: _buildBoton(
-                            texto: 'Entrada',
-                            icon: Icons.login_rounded,
-                            color: _primaryColor,
-                            disponible: _puedeMarcarEntrada,
-                            onPressed: widget.onMarcarEntrada,
-                            subtitulo: _puedeMarcarEntrada
-                                ? null
-                                : '30 min antes/despues',
-                          ),
-                        ),
-
-                      // Botón Salida
-                      if (widget.horario.yaMarcoEntrada &&
-                          !widget.horario.yaMarcoSalida)
-                        Expanded(
-                          child: _buildBoton(
-                            texto: 'Salida',
-                            icon: Icons.logout_rounded,
-                            color: _dangerColor,
-                            disponible: _puedeMarcarSalida,
-                            onPressed: () => _mostrarDialogoSalida(context),
-                            subtitulo: _puedeMarcarSalida
-                                ? null
-                                : '30 min antes/despues',
-                          ),
-                        ),
-                    ],
                   ),
-
-                  // Estado completado
-                  if (widget.horario.estaCompletado) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            _successColor,
-                            _successColor.withOpacity(0.7)
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          const Text(
-                            'Asistencia completada',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
-              ),
+
+                const SizedBox(height: 16),
+
+                // ============================================
+                // BOTONES - iOS Style
+                // ============================================
+                Row(
+                  children: [
+                    if (!widget.horario.yaMarcoEntrada)
+                      Expanded(
+                        child: _buildBotonIOS(
+                          texto: 'Marcar Entrada',
+                          icon: CupertinoIcons.arrow_right_to_line_alt,
+                          color: _iosBlue,
+                          disponible: _puedeMarcarEntrada,
+                          onPressed: widget.onMarcarEntrada,
+                        ),
+                      ),
+                    if (widget.horario.yaMarcoEntrada &&
+                        !widget.horario.yaMarcoSalida)
+                      Expanded(
+                        child: _buildBotonIOS(
+                          texto: 'Marcar Salida',
+                          icon: CupertinoIcons.arrow_left_to_line_alt,
+                          color: _iosRed,
+                          disponible: _puedeMarcarSalida,
+                          onPressed: () => _mostrarDialogoSalida(context),
+                        ),
+                      ),
+                  ],
+                ),
+
+                // Estado completado
+                if (widget.horario.estaCompletado) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [_iosGreen, _iosGreen.withOpacity(0.7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          CupertinoIcons.checkmark_circle,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Asistencia completada',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            CupertinoIcons.checkmark,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   List<Color> _getColorHeader() {
     if (widget.horario.estaCompletado) {
-      return [const Color(0xFF00B894), const Color(0xFF00A381)];
+      return [_iosGreen, _iosGreen.withOpacity(0.7)];
     }
     if (widget.horario.yaMarcoEntrada) {
-      return [const Color(0xFFFDCB6E), const Color(0xFFF39C12)];
+      return [_iosYellow, _iosOrange];
     }
-    return [const Color(0xFF5B67CA), const Color(0xFF8B95E0)];
+    return [_iosBlue, _iosBlue.withOpacity(0.7)];
   }
 
-  Widget _buildBoton({
+  // ============================================
+  // BOTÓN ESTILO iOS
+  // ============================================
+  Widget _buildBotonIOS({
     required String texto,
     required IconData icon,
     required Color color,
     required bool disponible,
     required VoidCallback onPressed,
-    String? subtitulo,
   }) {
-    return ElevatedButton(
+    return CupertinoButton(
       onPressed: disponible ? onPressed : null,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: disponible ? color : Colors.grey.shade300,
-        foregroundColor: disponible ? Colors.white : Colors.grey.shade600,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        minimumSize: const Size(0, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        elevation: disponible ? 2 : 0,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                texto,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+      padding: EdgeInsets.zero,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: disponible ? color : _iosLightGray,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: disponible ? color : _iosSeparator,
+            width: 0.5,
           ),
-          if (subtitulo != null) ...[
-            const SizedBox(height: 2),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: disponible ? Colors.white : _iosGray,
+            ),
+            const SizedBox(width: 6),
             Text(
-              subtitulo,
+              texto,
               style: TextStyle(
-                fontSize: 9,
-                color: disponible ? Colors.white70 : Colors.grey.shade500,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: disponible ? Colors.white : _iosGray,
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 
+  // ============================================
+  // DIALOGO SALIDA - iOS Style
+  // ============================================
   void _mostrarDialogoSalida(BuildContext context) {
     final ahora = DateTime.now();
     final horaFinParts = widget.horario.horaFin.split(':');
@@ -730,203 +700,165 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
     final diferencia = ahora.difference(fin);
     final minutosDiferencia = diferencia.inMinutes;
 
-    String titulo = 'Confirmar salida';
+    String titulo = 'Confirmar Salida';
     String mensaje = '¿Desea marcar su salida ahora?';
-    Color color = _primaryColor;
-    IconData icono = Icons.exit_to_app_rounded;
+    Color color = _iosBlue;
+    IconData icono = CupertinoIcons.arrow_right_to_line_alt;
 
     if (minutosDiferencia < 0) {
       final minutosAntes = minutosDiferencia.abs();
-      titulo = 'Salida anticipada';
-      mensaje =
-          'Está saliendo $minutosAntes minutos antes de la hora programada.';
-      color = minutosAntes > 15 ? Colors.red.shade600 : Colors.orange.shade600;
-      icono = Icons.warning_amber_rounded;
+      titulo = 'Salida Anticipada';
+      mensaje = 'Está saliendo $minutosAntes min antes de lo programado.';
+      color = minutosAntes > 15 ? _iosRed : _iosOrange;
+      icono = CupertinoIcons.exclamationmark_triangle;
     } else if (minutosDiferencia <= 15) {
-      titulo = 'Salida en horario';
+      titulo = 'Salida en Horario';
       mensaje = 'Está saliendo dentro del horario establecido.';
-      color = _successColor;
-      icono = Icons.check_circle_rounded;
+      color = _iosGreen;
+      icono = CupertinoIcons.checkmark_circle;
     } else {
-      titulo = 'Salida tardía';
+      titulo = 'Salida Tardía';
       mensaje =
-          'Está saliendo $minutosDiferencia minutos después de la hora programada.';
-      color = Colors.orange.shade600;
-      icono = Icons.timer_rounded;
+          'Está saliendo $minutosDiferencia min después de lo programado.';
+      color = _iosOrange;
+      icono = CupertinoIcons.timer;
     }
 
-    showDialog(
+    showCupertinoDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+      builder: (context) => CupertinoAlertDialog(
+        title: Row(
+          children: [
+            Icon(icono, color: color, size: 24),
+            const SizedBox(width: 10),
+            Text(titulo),
+          ],
         ),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+        content: Column(
+          children: [
+            const SizedBox(height: 8),
+            Text(mensaje),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _iosLightGray,
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Icono circular
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [color, color.withOpacity(0.7)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icono,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                titulo,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                mensaje,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: _textSecondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _backgroundColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.grey.shade200,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoRow('Materia', widget.horario.materia),
-                    _buildInfoRow('Paralelo', widget.horario.paralelo),
-                    _buildInfoRow('Hora salida', widget.horario.horaFin),
-                    _buildInfoRow(
-                      'Hora actual',
-                      DateFormat('HH:mm').format(ahora),
-                    ),
-                    if (minutosDiferencia.abs() > 0)
-                      _buildInfoRow(
-                        'Diferencia',
-                        '${minutosDiferencia.abs()} min ${minutosDiferencia > 0 ? 'después' : 'antes'}',
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      style: TextButton.styleFrom(
-                        foregroundColor: _textSecondary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Cancelar'),
-                    ),
+                  _buildInfoRowIOS('Materia', widget.horario.materia),
+                  _buildInfoRowIOS('Paralelo', widget.horario.paralelo),
+                  _buildInfoRowIOS('Hora salida', widget.horario.horaFin),
+                  _buildInfoRowIOS(
+                    'Hora actual',
+                    DateFormat('HH:mm').format(ahora),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context, true);
-                        widget.onMarcarSalida();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: color,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_rounded, size: 18),
-                          SizedBox(width: 6),
-                          Text(
-                            'Confirmar',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+                  if (minutosDiferencia.abs() > 0)
+                    _buildInfoRowIOS(
+                      'Diferencia',
+                      '${minutosDiferencia.abs()} min ${minutosDiferencia > 0 ? 'después' : 'antes'}',
                     ),
-                  ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onMarcarSalida();
+            },
+            isDestructiveAction: minutosDiferencia.abs() > 15,
+            child: Text(
+              'Confirmar',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRowIOS(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 100,
+            width: 90,
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 13,
-                color: _textSecondary,
+                fontSize: 12,
+                color: _iosGray,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 13,
+              style: TextStyle(
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: _textPrimary,
+                color: _iosLabel,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ============================================
+// CARD ESTILO iOS
+// ============================================
+class CupertinoCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry margin;
+
+  const CupertinoCard({
+    super.key,
+    required this.child,
+    this.margin = EdgeInsets.zero,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: margin,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+        border: Border.all(
+          color: const Color(0xFFE5E5EA),
+          width: 0.5,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: child,
       ),
     );
   }

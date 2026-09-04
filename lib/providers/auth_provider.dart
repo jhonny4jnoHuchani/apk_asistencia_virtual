@@ -305,4 +305,75 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  // En AuthProvider
+
+  /// Actualizar foto de perfil
+  Future<bool> updateProfilePhoto(File imageFile) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _authService.updateFoto(imageFile);
+
+      if (response['success'] == true) {
+        // Actualizar usuario local con la nueva foto
+        final data = response['data'];
+        if (_user != null && data != null) {
+          _user = _user!.copyWith(
+            fotoPerfil: data['foto_perfil'],
+            fotoPerfilUrl: data['foto_perfil_url'],
+          );
+        }
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response['message'] ?? 'Error al actualizar la foto';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Eliminar foto de perfil
+  Future<bool> deleteProfilePhoto() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _authService.deleteFoto();
+
+      if (response['success'] == true) {
+        // Actualizar usuario local
+        if (_user != null) {
+          _user = _user!.copyWith(
+            fotoPerfil: null,
+            fotoPerfilUrl: null,
+          );
+        }
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response['message'] ?? 'Error al eliminar la foto';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
 }
