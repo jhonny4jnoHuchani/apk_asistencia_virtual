@@ -19,13 +19,31 @@ class StatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmall = screenWidth < 360;
+    final isMedium = screenWidth < 400;
+
+    // Tamaños adaptativos
+    final marginV = isSmall ? 2 : (isMedium ? 3 : 4);
+    final paddingH = isSmall ? 8 : (isMedium ? 10 : 12);
+    final paddingV = isSmall ? 4 : (isMedium ? 6 : 8);
+    final iconSize = isSmall ? 24 : (isMedium ? 28 : 32);
+    final iconInner = isSmall ? 14 : (isMedium ? 16 : 18);
+    final fontSize = isSmall ? 10 : (isMedium ? 11 : 12);
+    final subFontSize = isSmall ? 9 : (isMedium ? 10 : 11);
+    final spinnerSize = isSmall ? 12 : (isMedium ? 14 : 16);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin:
+          EdgeInsets.symmetric(horizontal: 16, vertical: marginV.toDouble()),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: paddingH.toDouble(),
+          vertical: paddingV.toDouble(),
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(isSmall ? 10 : 14),
           border: Border.all(
             color: Colors.grey.shade200,
             width: 1,
@@ -33,7 +51,7 @@ class StatusBar extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(0.05),
-              blurRadius: 10,
+              blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
@@ -41,8 +59,8 @@ class StatusBar extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: iconSize.toDouble(),
+              height: iconSize.toDouble(),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -50,33 +68,38 @@ class StatusBar extends StatelessWidget {
                     Colors.deepPurple.shade700
                   ],
                 ),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 posicion['icono'] as IconData,
                 color: Colors.white,
-                size: 22,
+                size: iconInner.toDouble(),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
                       Icon(
                         Icons.volume_up,
                         color: Colors.deepPurple[400],
-                        size: 14,
+                        size: fontSize - 2,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        posicion['nombre']!.toUpperCase(),
-                        style: TextStyle(
-                          color: Colors.deepPurple[700],
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                      const SizedBox(width: 2),
+                      Flexible(
+                        child: Text(
+                          posicion['nombre']!.toUpperCase(),
+                          style: TextStyle(
+                            color: Colors.deepPurple[700],
+                            fontSize: fontSize.toDouble(),
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ],
@@ -89,25 +112,27 @@ class StatusBar extends StatelessWidget {
                       color: isAutomaticMode
                           ? Colors.deepPurple.shade600
                           : Colors.grey[600],
-                      fontSize: 13,
+                      fontSize: subFontSize.toDouble(),
                       fontWeight: FontWeight.w500,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ],
               ),
             ),
             if (isCapturing)
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
                   color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: spinnerSize.toDouble(),
+                  height: spinnerSize.toDouble(),
                   child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
+                    strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(
                       Colors.red.shade500,
                     ),

@@ -163,36 +163,53 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<bool?> _showBiometricDialog() {
     return showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.fingerprint_rounded, color: _primaryColor, size: 28),
-            const SizedBox(width: 12),
-            const Text('Biometría no disponible'),
-          ],
-        ),
-        content: const Text('¿Desea continuar sin autenticación biométrica?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+      builder: (ctx) {
+        // Obtener el ancho de la pantalla
+        final screenWidth = MediaQuery.of(ctx).size.width;
+        final isSmallScreen = screenWidth < 360; // Pantallas muy pequeñas
+
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          title: Row(
+            children: [
+              Icon(Icons.fingerprint_rounded, color: _primaryColor, size: 28),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  isSmallScreen
+                      ? 'Biometría no disp.'
+                      : 'Biometría no disponible',
+                  overflow: TextOverflow.visible,
+                  softWrap: true,
+                  style: const TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
               ),
-            ),
-            child: const Text('Continuar'),
+            ],
           ),
-        ],
-      ),
+          content: const Text('¿Desea continuar sin autenticación biométrica?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Continuar'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -363,15 +380,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _instruccionGesto(String gesto) {
     switch (gesto) {
-      case 'arriba':
-        return 'Por favor, mire hacia arriba suavemente';
-      case 'abajo':
-        return 'Por favor, mire hacia abajo suavemente';
-      case 'izquierda':
-        return 'Por favor, gire suavemente hacia la izquierda';
-      case 'derecha':
-        return 'Por favor, gire suavemente hacia la derecha';
-
       default:
         return 'Por favor, mire al frente';
     }

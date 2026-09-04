@@ -21,11 +21,9 @@ class _HistorialScreenState extends State<HistorialScreen> {
   DateTime? _filtroFecha;
   int? _filtroMes;
 
-  // Controladores de scroll
   final ScrollController _scrollController = ScrollController();
   bool _showScrollToTop = false;
 
-  // Constantes de diseño
   static const Color _primaryColor = Color(0xFF5B67CA);
   static const Color _secondaryColor = Color(0xFF8B95E0);
   static const Color _backgroundColor = Color(0xFFF8F9FC);
@@ -70,7 +68,6 @@ class _HistorialScreenState extends State<HistorialScreen> {
       );
 
       if (mounted) {
-        // Agrupar los marcados por horario
         final grupos = _agruparPorHorario(resultado);
         setState(() {
           _marcados = resultado;
@@ -310,7 +307,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12), // Reducido padding
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.only(
@@ -340,36 +337,39 @@ class _HistorialScreenState extends State<HistorialScreen> {
             child: const Icon(
               Icons.history_rounded,
               color: Colors.white,
-              size: 24,
+              size: 22, // Reducido tamaño
             ),
           ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Historial',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: _textPrimary,
+          const SizedBox(width: 12),
+          // Usamos Flexible para evitar overflow
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Historial',
+                  style: TextStyle(
+                    fontSize: 20, // Reducido de 24
+                    fontWeight: FontWeight.bold,
+                    color: _textPrimary,
+                  ),
                 ),
-              ),
-              Text(
-                _grupos.isNotEmpty
-                    ? '${_grupos.length} registros agrupados'
-                    : 'Sin registros',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: _textSecondary,
+                Text(
+                  _grupos.isNotEmpty
+                      ? '${_grupos.length} registros agrupados'
+                      : 'Sin registros',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _textSecondary,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           if (_grupos.isNotEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: _primaryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
@@ -377,7 +377,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
               child: Text(
                 'Total: ${_grupos.length}',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: _primaryColor,
                 ),
@@ -390,7 +390,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
 
   Widget _buildFiltros() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
           Expanded(
@@ -403,7 +403,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
               onPressed: _seleccionarFecha,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
             child: _buildFilterChip(
               icon: Icons.date_range_rounded,
@@ -417,29 +417,28 @@ class _HistorialScreenState extends State<HistorialScreen> {
               onPressed: _seleccionarMes,
             ),
           ),
-          if (_filtroFecha != null || _filtroMes != null)
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _limpiarFiltros,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: _dangerColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 20,
-                      color: _dangerColor,
-                    ),
+          if (_filtroFecha != null || _filtroMes != null) ...[
+            const SizedBox(width: 6),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _limpiarFiltros,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(8), // Reducido
+                  decoration: BoxDecoration(
+                    color: _dangerColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 16, // Reducido
+                    color: _dangerColor,
                   ),
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -453,16 +452,16 @@ class _HistorialScreenState extends State<HistorialScreen> {
   }) {
     return Material(
       color: isActive ? _primaryColor : Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      elevation: isActive ? 4 : 0,
+      borderRadius: BorderRadius.circular(14),
+      elevation: isActive ? 2 : 0,
       shadowColor: _primaryColor.withOpacity(0.3),
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isActive ? _primaryColor : Colors.grey.shade200,
               width: 1,
@@ -470,18 +469,19 @@ class _HistorialScreenState extends State<HistorialScreen> {
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min, // Importante: evita overflow
             children: [
               Icon(
                 icon,
-                size: 16,
+                size: 14,
                 color: isActive ? Colors.white : _textSecondary,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Flexible(
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                     color: isActive ? Colors.white : _textSecondary,
                   ),
@@ -519,7 +519,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
       backgroundColor: Colors.white,
       child: ListView.builder(
         controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
         itemCount: _grupos.length,
         itemBuilder: (context, index) {
           final grupo = _grupos[index];
@@ -665,55 +665,54 @@ class _HistorialScreenState extends State<HistorialScreen> {
     final estadoColor = completado ? _successColor : _warningColor;
     final estadoTexto = completado ? 'Completado' : 'Pendiente';
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.only(bottom: 14),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: _cardShadowColor,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
         border: Border.all(
           color: completado
-              ? _successColor.withOpacity(0.3)
-              : _warningColor.withOpacity(0.3),
+              ? _successColor.withOpacity(0.2)
+              : _warningColor.withOpacity(0.2),
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header de la tarjeta
-          Container(
-            padding: const EdgeInsets.all(16),
+          // Header - Con diseño compacto
+          Padding(
+            padding: const EdgeInsets.all(12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Icono según estado
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [estadoColor, estadoColor.withOpacity(0.7)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     completado
                         ? Icons.check_circle_rounded
                         : Icons.pending_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -721,28 +720,28 @@ class _HistorialScreenState extends State<HistorialScreen> {
                       Text(
                         grupo.materia,
                         style: const TextStyle(
-                          fontSize: 17,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: _textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Row(
                         children: [
                           Text(
                             'Paralelo ${grupo.paralelo}',
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               color: _textSecondary,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Text(
                             fechaFormateada,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               color: Colors.grey.shade500,
                             ),
                           ),
@@ -751,15 +750,13 @@ class _HistorialScreenState extends State<HistorialScreen> {
                     ],
                   ),
                 ),
-                // Badge de estado
+                const SizedBox(width: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: estadoColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
+                    color: estadoColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -768,14 +765,14 @@ class _HistorialScreenState extends State<HistorialScreen> {
                         completado
                             ? Icons.check_circle_rounded
                             : Icons.pending_rounded,
-                        size: 12,
+                        size: 10,
                         color: estadoColor,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 2),
                       Text(
                         estadoTexto,
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w700,
                           color: estadoColor,
                         ),
@@ -790,11 +787,11 @@ class _HistorialScreenState extends State<HistorialScreen> {
           Container(
             height: 1,
             color: Colors.grey.shade100,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
+            margin: const EdgeInsets.symmetric(horizontal: 12),
           ),
-          // Entrada y Salida
+          // Entrada y Salida - AHORA MÁS COMPACTO
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: Row(
               children: [
                 Expanded(
@@ -805,7 +802,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
                     icon: Icons.login_rounded,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 10),
                 Expanded(
                   child: _buildMarcadoItem(
                     tipo: 'Salida',
@@ -817,39 +814,40 @@ class _HistorialScreenState extends State<HistorialScreen> {
               ],
             ),
           ),
-          // Ubicación
+          // Ubicación - MÁS COMPACTA
           if (grupo.ubicacion != null) ...[
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.location_on_outlined,
-                    size: 14,
-                    color: Colors.grey.shade500,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      grupo.ubicacion!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 12,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        grupo.ubicacion!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
           ],
         ],
       ),
@@ -868,12 +866,12 @@ class _HistorialScreenState extends State<HistorialScreen> {
     final bool esPuntual = existe ? marcado!.esPuntual : false;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: existe ? color.withOpacity(0.05) : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
+        color: existe ? color.withOpacity(0.04) : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: existe ? color.withOpacity(0.3) : Colors.grey.shade200,
+          color: existe ? color.withOpacity(0.2) : Colors.grey.shade200,
           width: 1,
         ),
       ),
@@ -884,14 +882,14 @@ class _HistorialScreenState extends State<HistorialScreen> {
             children: [
               Icon(
                 icon,
-                size: 14,
+                size: 12,
                 color: existe ? color : Colors.grey.shade400,
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 3),
               Text(
                 tipo,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: existe ? color : Colors.grey.shade400,
                 ),
@@ -900,14 +898,14 @@ class _HistorialScreenState extends State<HistorialScreen> {
               Text(
                 hora,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: existe ? _textPrimary : Colors.grey.shade400,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           if (existe) ...[
             Row(
               children: [
@@ -915,16 +913,20 @@ class _HistorialScreenState extends State<HistorialScreen> {
                   esPuntual
                       ? Icons.check_circle_rounded
                       : Icons.warning_amber_rounded,
-                  size: 12,
+                  size: 10,
                   color: esPuntual ? _successColor : _warningColor,
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  estado,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: esPuntual ? _successColor : _warningColor,
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    estado,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: esPuntual ? _successColor : _warningColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -933,7 +935,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
             Text(
               'No registrado',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontStyle: FontStyle.italic,
                 color: Colors.grey.shade500,
               ),

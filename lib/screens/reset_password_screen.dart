@@ -1,4 +1,3 @@
-// lib/screens/reset_password_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -30,6 +29,30 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _isLoading = false;
   bool _passwordReset = false;
   String? _error;
+  double _passwordStrength = 0.0; // NUEVO
+
+  static const Color _primaryColor = Color(0xFF6C63FF);
+  static const Color _secondaryColor = Color(0xFF3B82F6);
+  static const Color _darkColor = Color(0xFF1A1A2E);
+  static const Color _successColor = Color(0xFF00B894);
+  static const Color _errorColor = Color(0xFFE17055);
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_updatePasswordStrength); // NUEVO
+  }
+
+  void _updatePasswordStrength() {
+    // NUEVO
+    final password = _passwordController.text;
+    double strength = 0;
+    if (password.length >= 6) strength += 0.25;
+    if (RegExp(r'[A-Z]').hasMatch(password)) strength += 0.25;
+    if (RegExp(r'[0-9]').hasMatch(password)) strength += 0.25;
+    if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) strength += 0.25;
+    setState(() => _passwordStrength = strength);
+  }
 
   @override
   void dispose() {
@@ -48,8 +71,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     try {
       final authProvider = context.read<AuthProvider>();
-
-      // Usar el nuevo método setPassword
       final success = await authProvider.setPassword(
         newPassword: _passwordController.text,
         confirmPassword: _confirmPasswordController.text,
@@ -62,22 +83,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           _passwordReset = true;
           _isLoading = false;
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.fromRegistration
-                  ? 'Contraseña creada exitosamente'
-                  : 'Contraseña restablecida exitosamente',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
       } else {
         setState(() {
           _error = authProvider.error ?? 'Error al establecer la contraseña';
@@ -95,436 +100,448 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.fromRegistration
-              ? 'Establecer Contraseña'
-              : 'Restablecer Contraseña',
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.blue.shade700,
-        elevation: 0,
-        leading: widget.fromRegistration
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                tooltip: 'Volver al registro',
-              )
-            : null,
-      ),
+      backgroundColor: Colors.white,
+      appBar: _buildAppBar(),
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.blue.shade50, Colors.white],
-          ),
-        ),
+        decoration: _buildBackgroundDecoration(),
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 20),
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade100,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    widget.fromRegistration
-                        ? Icons.password_rounded
-                        : Icons.lock_reset,
-                    color: Colors.blue,
-                    size: 40,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  widget.fromRegistration
-                      ? 'Crear Contraseña'
-                      : 'Nueva Contraseña',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade800,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.fromRegistration
-                      ? 'Establece una contraseña segura para tu cuenta'
-                      : 'Ingresa tu nueva contraseña para restablecer el acceso',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.email, size: 16, color: Colors.grey),
-                      const SizedBox(width: 8),
-                      Text(
-                        widget.fromRegistration
-                            ? 'Creando contraseña para: ${widget.email}'
-                            : 'Restableciendo para: ${widget.email}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        children: [
-                          if (_passwordReset) ...[
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border:
-                                    Border.all(color: Colors.green.shade200),
-                              ),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green.shade700,
-                                    size: 48,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    widget.fromRegistration
-                                        ? 'Contraseña creada'
-                                        : 'Contraseña actualizada',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green.shade700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    widget.fromRegistration
-                                        ? 'Tu cuenta ha sido configurada correctamente.'
-                                        : 'Tu contraseña ha sido restablecida correctamente.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.green.shade600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      if (widget.fromRegistration) {
-                                        Navigator.pushReplacement(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => const HomeScreen(),
-                                          ),
-                                        );
-                                      } else {
-                                        Navigator.pushReplacement(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => const LoginScreen(),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 32,
-                                        vertical: 14,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      widget.fromRegistration
-                                          ? 'Ir a la página principal'
-                                          : 'Ir al inicio de sesión',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ] else ...[
-                            if (_error != null)
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                margin: const EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border:
-                                      Border.all(color: Colors.red.shade200),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.error_outline,
-                                      color: Colors.red.shade700,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _error!,
-                                        style: TextStyle(
-                                          color: Colors.red.shade700,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              margin: const EdgeInsets.only(bottom: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.blue.shade200),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Requisitos de la contraseña:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.blue.shade700,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    '• Minimo 6 caracteres',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                  const Text(
-                                    '• Incluir al menos una letra mayuscula',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                  const Text(
-                                    '• Incluir al menos un numero',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextFormField(
-                              controller: _passwordController,
-                              obscureText: _obscurePassword,
-                              decoration: InputDecoration(
-                                labelText: 'Nueva contraseña',
-                                hintText: 'Minimo 6 caracteres',
-                                prefixIcon: Icon(
-                                  Icons.lock,
-                                  color: Colors.blue.shade400,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey.shade300),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.blue.shade400,
-                                    width: 2,
-                                  ),
-                                ),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                  onPressed: () {
-                                    setState(() =>
-                                        _obscurePassword = !_obscurePassword);
-                                  },
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Ingresa tu nueva contraseña';
-                                }
-                                if (value.length < 6) {
-                                  return 'Minimo 6 caracteres';
-                                }
-                                if (!RegExp(r'[A-Z]').hasMatch(value)) {
-                                  return 'Debe incluir al menos una mayuscula';
-                                }
-                                if (!RegExp(r'[0-9]').hasMatch(value)) {
-                                  return 'Debe incluir al menos un numero';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _confirmPasswordController,
-                              obscureText: _obscureConfirmPassword,
-                              decoration: InputDecoration(
-                                labelText: 'Confirmar contraseña',
-                                hintText: 'Repite tu nueva contraseña',
-                                prefixIcon: Icon(
-                                  Icons.lock_outline,
-                                  color: Colors.blue.shade400,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey.shade300),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.blue.shade400,
-                                    width: 2,
-                                  ),
-                                ),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscureConfirmPassword
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                  onPressed: () {
-                                    setState(() => _obscureConfirmPassword =
-                                        !_obscureConfirmPassword);
-                                  },
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Confirma tu nueva contraseña';
-                                }
-                                if (value != _passwordController.text) {
-                                  return 'Las contraseñas no coinciden';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              height: 54,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _setPassword,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue.shade700,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        height: 24,
-                                        width: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Text(
-                                        widget.fromRegistration
-                                            ? 'Crear Contraseña'
-                                            : 'Restablecer Contraseña',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            if (!widget.fromRegistration)
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const LoginScreen(),
-                                    ),
-                                  );
-                                },
-                                child: Text(
-                                  'Volver al inicio de sesión',
-                                  style: TextStyle(
-                                    color: Colors.blue.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                _buildHeader(),
+                const SizedBox(height: 16),
+                _buildFormCard(),
+                const SizedBox(height: 12),
+                _buildFooter(),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Text(
+        widget.fromRegistration ? 'Crear Contraseña' : 'Restablecer Contraseña',
+        style: const TextStyle(
+            fontWeight: FontWeight.bold, fontSize: 17, color: _darkColor),
+      ),
+      centerTitle: true,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: widget.fromRegistration
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: _darkColor),
+              onPressed: () => Navigator.pop(context),
+            )
+          : null,
+    );
+  }
+
+  BoxDecoration _buildBackgroundDecoration() {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [const Color(0xFFEEF2FF), Colors.white],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Column(
+      children: [
+        TweenAnimationBuilder(
+          // NUEVO: Animación de entrada
+          tween: Tween<double>(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 600),
+          builder: (_, double val, child) =>
+              Transform.scale(scale: val, child: child),
+          child: Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                  colors: [_primaryColor, _secondaryColor]),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                    color: _primaryColor.withOpacity(0.3),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6))
+              ],
+            ),
+            child: Icon(
+              widget.fromRegistration
+                  ? Icons.password_rounded
+                  : Icons.lock_reset_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          widget.fromRegistration ? 'Crear Contraseña' : 'Nueva Contraseña',
+          style: const TextStyle(
+              fontSize: 22, fontWeight: FontWeight.bold, color: _darkColor),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            widget.fromRegistration
+                ? 'Establece una contraseña segura para tu cuenta'
+                : 'Ingresa tu nueva contraseña para restablecer el acceso',
+            style: TextStyle(
+                fontSize: 13.5, color: Colors.grey.shade600, height: 1.4),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(20)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.email_rounded, size: 14, color: Colors.grey.shade600),
+              const SizedBox(width: 6),
+              Text(widget.email,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormCard() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.grey.shade200)),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_passwordReset)
+                _buildSuccessWidget()
+              else ...[
+                if (_error != null) _buildErrorWidget(),
+                _buildRequirementsWidget(),
+                const SizedBox(height: 12),
+                _buildPasswordField(),
+                const SizedBox(height: 6),
+                _buildPasswordStrengthBar(), // NUEVO
+                const SizedBox(height: 12),
+                _buildConfirmPasswordField(),
+                const SizedBox(height: 18),
+                _buildSubmitButton(),
+                const SizedBox(height: 8),
+                if (!widget.fromRegistration) _buildBackButton(),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordStrengthBar() {
+    // NUEVO
+    Color color = _passwordStrength < 0.5
+        ? _errorColor
+        : _passwordStrength < 0.75
+            ? Colors.orange
+            : _successColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: _passwordStrength,
+            backgroundColor: Colors.grey.shade200,
+            valueColor: AlwaysStoppedAnimation(color),
+            minHeight: 4,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _passwordStrength < 0.5
+              ? 'Débil'
+              : _passwordStrength < 0.75
+                  ? 'Media'
+                  : 'Fuerte',
+          style: TextStyle(
+              fontSize: 11, color: color, fontWeight: FontWeight.w600),
+        )
+      ],
+    );
+  }
+
+  Widget _buildRequirementsWidget() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+          color: _primaryColor.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(10)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(Icons.info_outline_rounded, size: 14, color: _primaryColor),
+            const SizedBox(width: 6),
+            Text('Requisitos:',
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: _primaryColor,
+                    fontSize: 12)),
+          ]),
+          const SizedBox(height: 4),
+          Wrap(spacing: 12, runSpacing: 2, children: [
+            _buildRequirementItem('6+ caracteres'),
+            _buildRequirementItem('1 Mayúscula'),
+            _buildRequirementItem('1 Número'),
+            _buildRequirementItem('1 Símbolo'), // AGREGADO
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequirementItem(String text) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(Icons.check_circle_rounded,
+          size: 10, color: _primaryColor.withOpacity(0.5)),
+      const SizedBox(width: 4),
+      Text(text, style: const TextStyle(fontSize: 11.5, color: Colors.black54)),
+    ]);
+  }
+
+  Widget _buildPasswordField() {
+    return TextFormField(
+      controller: _passwordController,
+      obscureText: _obscurePassword,
+      style: const TextStyle(fontSize: 15),
+      textInputAction: TextInputAction.next,
+      decoration: _inputDecoration(
+          'Nueva contraseña',
+          'Mínimo 6 caracteres',
+          Icons.lock_outline_rounded,
+          _obscurePassword,
+          () => setState(() => _obscurePassword = !_obscurePassword)),
+      validator: (value) {
+        if (value == null || value.isEmpty)
+          return 'Ingresa tu nueva contraseña';
+        if (value.length < 6) return 'Mínimo 6 caracteres';
+        if (!RegExp(r'[A-Z]').hasMatch(value))
+          return 'Debe incluir una mayúscula';
+        if (!RegExp(r'[0-9]').hasMatch(value)) return 'Debe incluir un número';
+        if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value))
+          return 'Debe incluir un símbolo';
+        return null;
+      },
+    );
+  }
+
+  Widget _buildConfirmPasswordField() {
+    return TextFormField(
+      controller: _confirmPasswordController,
+      obscureText: _obscureConfirmPassword,
+      style: const TextStyle(fontSize: 15),
+      textInputAction: TextInputAction.done,
+      onFieldSubmitted: (_) => _setPassword(),
+      decoration: _inputDecoration(
+          'Confirmar contraseña',
+          'Repite tu contraseña',
+          Icons.lock_outline_rounded,
+          _obscureConfirmPassword,
+          () => setState(
+              () => _obscureConfirmPassword = !_obscureConfirmPassword)),
+      validator: (value) {
+        if (value == null || value.isEmpty)
+          return 'Confirma tu nueva contraseña';
+        if (value != _passwordController.text)
+          return 'Las contraseñas no coinciden';
+        return null;
+      },
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, String hint, IconData icon,
+      bool obscure, VoidCallback onToggle) {
+    // HELPER
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+      hintText: hint,
+      hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+      prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      filled: true,
+      fillColor: Colors.grey.shade50,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      suffixIcon: IconButton(
+          icon: Icon(
+              obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+              color: Colors.grey.shade500,
+              size: 20),
+          onPressed: onToggle),
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return Container(
+      // NUEVO: Gradiente
+      height: 48,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(colors: [_primaryColor, _secondaryColor]),
+        boxShadow: [
+          BoxShadow(
+              color: _primaryColor.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _setPassword,
+        style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12))),
+        child: _isLoading
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.5, color: Colors.white))
+            : Text(widget.fromRegistration ? 'Crear Contraseña' : 'Restablecer',
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+
+  Widget _buildBackButton() {
+    return TextButton(
+      onPressed: () => Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (_) => const LoginScreen())),
+      child: Text('Volver al inicio de sesión',
+          style: TextStyle(
+              color: _primaryColor, fontWeight: FontWeight.w600, fontSize: 13)),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+          color: const Color(0xFFFFF5F5),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _errorColor.withOpacity(0.2))),
+      child: Row(children: [
+        Icon(Icons.error_outline_rounded, color: _errorColor, size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text(_error!,
+                style: TextStyle(color: _errorColor, fontSize: 13))),
+      ]),
+    );
+  }
+
+  Widget _buildSuccessWidget() {
+    return TweenAnimationBuilder(
+      // NUEVO: Animación
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 500),
+      builder: (_, double val, child) => Opacity(
+          opacity: val,
+          child: Transform.translate(
+              offset: Offset(0, 20 * (1 - val)), child: child)),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [
+              Colors.green.shade50,
+              Colors.green.shade100.withOpacity(0.5)
+            ]),
+            borderRadius: BorderRadius.circular(14)),
+        child: Column(children: [
+          Icon(Icons.check_circle_rounded, color: _successColor, size: 48),
+          const SizedBox(height: 12),
+          Text(
+              widget.fromRegistration
+                  ? 'Contraseña creada'
+                  : 'Contraseña actualizada',
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _darkColor)),
+          const SizedBox(height: 4),
+          Text(
+              widget.fromRegistration
+                  ? 'Tu cuenta ha sido configurada correctamente.'
+                  : 'Tu contraseña ha sido restablecida.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => widget.fromRegistration
+                            ? const HomeScreen()
+                            : const LoginScreen()));
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: _primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 11)),
+              child: Text(
+                  widget.fromRegistration ? 'Ir al Inicio' : 'Ir a Login',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text('Sistema de Asistencia Docente',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
       ),
     );
   }

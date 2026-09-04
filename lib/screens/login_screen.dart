@@ -46,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen>
   static const Color borderColor = Color(0xFFE5E7EB);
   static const Color errorColor = Color(0xFFEF4444);
 
-  // Colores neón para el logo
   static const Color neonCyan = Color(0xFF06D6A0);
   static const Color neonPurple = Color(0xFF7C3AED);
   static const Color neonPink = Color(0xFFEC4899);
@@ -54,7 +53,6 @@ class _LoginScreenState extends State<LoginScreen>
 
   final LocalAuthentication _localAuth = LocalAuthentication();
 
-  // Claves para SharedPreferences
   static const String _biometricPrefKey = 'biometric_enabled';
   static const String _biometricEmailKey = 'biometric_email';
   static const String _biometricPasswordKey = 'biometric_password';
@@ -167,13 +165,13 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _loginConBiometria() async {
     if (!_biometricAvailable) {
       _mostrarMensaje(
-          'Biometría no disponible en este dispositivo', Colors.orange);
+          'Biometria no disponible en este dispositivo', Colors.orange);
       return;
     }
 
     if (!_biometricEnabled) {
       _mostrarMensaje(
-        'Habilita la biometría en tu perfil primero',
+        'Habilita la biometria en tu perfil primero',
         Colors.orange,
       );
       return;
@@ -183,7 +181,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     try {
       final authenticated = await _localAuth.authenticate(
-        localizedReason: 'Inicia sesión con tu huella digital',
+        localizedReason: 'Inicia sesion con tu huella digital',
       );
 
       if (!mounted) return;
@@ -203,18 +201,18 @@ class _LoginScreenState extends State<LoginScreen>
         } else {
           setState(() => _isBiometricLoading = false);
           _mostrarMensaje(
-            'No hay credenciales guardadas para biometría',
+            'No hay credenciales guardadas para biometria',
             Colors.orange,
           );
         }
       } else {
         setState(() => _isBiometricLoading = false);
-        _mostrarMensaje('Autenticación biométrica fallida', Colors.red);
+        _mostrarMensaje('Autenticacion biometrica fallida', Colors.red);
       }
     } catch (e) {
       print('Error en autenticación biométrica: $e');
       setState(() => _isBiometricLoading = false);
-      _mostrarMensaje('Error al autenticar con biometría', Colors.red);
+      _mostrarMensaje('Error al autenticar con biometria', Colors.red);
     }
   }
 
@@ -249,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen>
       _navigateToNextScreen();
     } else {
       _mostrarMensaje(
-        authProvider.error ?? 'Error al iniciar sesión',
+        authProvider.error ?? 'Error al iniciar sesion',
         Colors.red,
       );
     }
@@ -285,13 +283,13 @@ class _LoginScreenState extends State<LoginScreen>
             Icon(
               color == Colors.green ? Icons.check_circle : Icons.error_outline,
               color: Colors.white,
-              size: 20,
+              size: 18,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 mensaje,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
               ),
             ),
           ],
@@ -299,8 +297,8 @@ class _LoginScreenState extends State<LoginScreen>
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         elevation: 0,
       ),
     );
@@ -317,53 +315,69 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmall = screenWidth < 360;
+    final isMedium = screenWidth < 400;
+
+    // Tamaños adaptativos
+    final horizontalPadding = isSmall ? 16.0 : (isMedium ? 20.0 : 28.0);
+    final logoSize = isSmall ? 72.0 : (isMedium ? 84.0 : 96.0);
+    final iconSize = isSmall ? 32.0 : (isMedium ? 36.0 : 42.0);
+    final titleSize = isSmall ? 24.0 : (isMedium ? 27.0 : 30.0);
+    final subtitleSize = isSmall ? 13.0 : (isMedium ? 14.0 : 16.0);
+    final cardPadding = isSmall ? 16.0 : (isMedium ? 22.0 : 28.0);
+    final buttonHeight = isSmall ? 48.0 : (isMedium ? 52.0 : 58.0);
+    final spacing = isSmall ? 12.0 : (isMedium ? 16.0 : 20.0);
+
     return Scaffold(
       backgroundColor: background,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: isSmall ? 12.0 : 20.0,
+            ),
             child: FadeTransition(
               opacity: _fadeAnimation,
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildLogo(),
-                    const SizedBox(height: 32),
-                    _buildHeader(),
-                    const SizedBox(height: 40),
-                    _buildLoginCard(),
-                    const SizedBox(height: 20),
-                    _buildOptionsRow(),
-                    const SizedBox(height: 28),
-                    _buildLoginButton(),
-
-                    // Botón biométrico - siempre visible si está disponible
-                    if (_biometricAvailable && _biometricEnabled) ...[
-                      const SizedBox(height: 16),
-                      _buildBiometricButton(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      kToolbarHeight -
+                      40,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildLogo(logoSize, iconSize),
+                      SizedBox(height: isSmall ? 16.0 : 24.0),
+                      _buildHeader(titleSize, subtitleSize),
+                      SizedBox(height: isSmall ? 20.0 : 28.0),
+                      _buildLoginCard(cardPadding, isSmall),
+                      SizedBox(height: isSmall ? 10.0 : 16.0),
+                      _buildOptionsRow(isSmall),
+                      SizedBox(height: isSmall ? 16.0 : 20.0),
+                      _buildLoginButton(buttonHeight, isSmall),
+                      if (_biometricAvailable && _biometricEnabled) ...[
+                        SizedBox(height: isSmall ? 10.0 : 14.0),
+                        _buildBiometricButton(buttonHeight, isSmall),
+                      ],
+                      SizedBox(height: isSmall ? 16.0 : 20.0),
+                      _buildDivider(isSmall),
+                      SizedBox(height: isSmall ? 12.0 : 16.0),
+                      if (_biometricAvailable && _biometricEnabled)
+                        _buildGoogleButtonOnly(buttonHeight, isSmall)
+                      else
+                        _buildSocialButtons(buttonHeight, isSmall),
+                      SizedBox(height: isSmall ? 16.0 : 20.0),
+                      _buildFooter(isSmall),
                     ],
-
-                    const SizedBox(height: 20),
-
-                    // Divider y opción de Google SOLO si hay biometría habilitada
-                    if (_biometricAvailable && _biometricEnabled) ...[
-                      _buildDivider(),
-                      const SizedBox(height: 20),
-                      _buildGoogleButtonOnly(),
-                    ] else ...[
-                      // Si NO hay biometría, mostrar todas las opciones sociales
-                      _buildDivider(),
-                      const SizedBox(height: 20),
-                      _buildSocialButtons(),
-                    ],
-
-                    const SizedBox(height: 28),
-                    _buildFooter(),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -373,7 +387,8 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildLogo() {
+  // ==================== LOGO ====================
+  Widget _buildLogo(double size, double iconSize) {
     return Center(
       child: Hero(
         tag: 'logo',
@@ -382,8 +397,8 @@ class _LoginScreenState extends State<LoginScreen>
           children: [
             AnimatedContainer(
               duration: const Duration(seconds: 3),
-              height: 130,
-              width: 130,
+              height: size * 1.4,
+              width: size * 1.4,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
@@ -397,8 +412,8 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
             Container(
-              height: 96,
-              width: 96,
+              height: size,
+              width: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
@@ -409,20 +424,20 @@ class _LoginScreenState extends State<LoginScreen>
                 boxShadow: [
                   BoxShadow(
                     color: neonCyan.withOpacity(0.3),
-                    blurRadius: 35,
+                    blurRadius: 30,
                     spreadRadius: 4,
-                    offset: const Offset(0, 10),
+                    offset: const Offset(0, 8),
                   ),
                   BoxShadow(
                     color: neonPurple.withOpacity(0.2),
-                    blurRadius: 45,
-                    spreadRadius: 8,
-                    offset: const Offset(0, 15),
+                    blurRadius: 40,
+                    spreadRadius: 6,
+                    offset: const Offset(0, 12),
                   ),
                 ],
               ),
               child: Container(
-                margin: const EdgeInsets.all(5),
+                margin: const EdgeInsets.all(4),
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white,
@@ -430,7 +445,7 @@ class _LoginScreenState extends State<LoginScreen>
                 child: Center(
                   child: Icon(
                     Icons.auto_awesome_rounded,
-                    size: 42,
+                    size: iconSize,
                     color: primary,
                   ),
                 ),
@@ -442,29 +457,30 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildHeader() {
+  // ==================== HEADER ====================
+  Widget _buildHeader(double titleSize, double subtitleSize) {
     return Column(
       children: [
         Text(
-          '¡Bienvenido de vuelta!',
+          'Bienvenido de vuelta!',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 30,
+            fontSize: titleSize,
             fontWeight: FontWeight.w800,
             color: textPrimary,
-            letterSpacing: -0.5,
+            letterSpacing: -0.3,
             height: 1.2,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: titleSize * 0.3),
         Text(
           'Accede a tu cuenta para continuar',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 16,
+            fontSize: subtitleSize,
             color: textSecondary,
             fontWeight: FontWeight.w400,
-            height: 1.5,
+            height: 1.4,
             letterSpacing: 0.2,
           ),
         ),
@@ -472,75 +488,58 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildLoginCard() {
+  // ==================== LOGIN CARD ====================
+  // ==================== LOGIN CARD ====================
+  Widget _buildLoginCard(double padding, bool isSmall) {
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: EdgeInsets.all(padding),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 40,
-            offset: const Offset(0, 12),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.white.withOpacity(0.8),
-          width: 1,
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.0),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Column(
         children: [
-          _buildTextField(
+          _buildCleanTextField(
             label: 'Correo electrónico',
-            icon: Icons.email_outlined,
+            icon: Icons.alternate_email_rounded,
             controller: _emailController,
-            hintText: 'tú@email.com',
             keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            isSmall: isSmall,
             validator: (value) {
-              if (value == null || value.trim().isEmpty) {
+              if (value == null || value.trim().isEmpty)
                 return 'Ingresa tu correo electrónico';
-              }
-              if (!value.contains('@') || !value.contains('.')) {
+              final emailRegex =
+                  RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+              if (!emailRegex.hasMatch(value.trim()))
                 return 'Ingresa un correo válido';
-              }
               return null;
             },
           ),
-          const SizedBox(height: 24),
-          _buildTextField(
+          const SizedBox(height: 16),
+          _buildCleanTextField(
             label: 'Contraseña',
-            icon: Icons.lock_outlined,
+            icon: Icons.lock_outline_rounded,
             controller: _passwordController,
-            hintText: '••••••••',
             obscureText: _obscurePassword,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _login(),
+            isSmall: isSmall,
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: textSecondary,
-                size: 22,
-              ),
-              onPressed: () {
-                setState(() => _obscurePassword = !_obscurePassword);
-              },
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
+                  _obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: textSecondary,
+                  size: 20),
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) {
+              if (value == null || value.isEmpty)
                 return 'Ingresa tu contraseña';
-              }
-              if (value.length < 6) {
-                return 'Mínimo 6 caracteres';
-              }
+              if (value.length < 6) return 'Mínimo 6 caracteres';
               return null;
             },
           ),
@@ -549,102 +548,72 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildTextField({
+// ==================== TEXT FIELD LIMPIO ====================
+  Widget _buildCleanTextField({
     required String label,
     required IconData icon,
     required TextEditingController controller,
-    required String hintText,
     bool obscureText = false,
     Widget? suffixIcon,
     TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+    void Function(String)? onFieldSubmitted,
+    required bool isSmall,
     String? Function(String?)? validator,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: textSecondary, size: 20),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: textPrimary,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          style: const TextStyle(
-            fontSize: 16,
-            color: textPrimary,
-            fontWeight: FontWeight.w500,
-          ),
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: TextStyle(
-              color: textHint,
-              fontSize: 15,
-              fontWeight: FontWeight.w400,
-            ),
-            suffixIcon: suffixIcon != null
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 14),
-                    child: suffixIcon,
-                  )
-                : null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: secondary, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: errorColor, width: 1.5),
-            ),
-            filled: true,
-            fillColor: background,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: 16,
-            ),
-          ),
-          validator: validator,
-        ),
-      ],
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onFieldSubmitted,
+      style: TextStyle(fontSize: isSmall ? 14.0 : 15.0, color: textPrimary),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: textSecondary, fontSize: 14),
+        prefixIcon: Icon(icon, color: textSecondary, size: 20),
+        suffixIcon: suffixIcon,
+        hintText: label == 'Correo electrónico' ? 'tu@email.com' : null,
+        hintStyle: TextStyle(color: textHint),
+        filled: true,
+        fillColor: const Color(0xFFFAFBFC), // Gris casi blanco
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: borderColor)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: borderColor)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+                color: secondary, width: 1.5)), // Solo borde morado al enfocar
+        errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: errorColor)),
+      ),
+      validator: validator,
     );
   }
 
-  Widget _buildOptionsRow() {
+  // ==================== OPTIONS ROW ====================
+  Widget _buildOptionsRow(bool isSmall) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildRememberMe(),
-        _buildForgotPassword(),
+        _buildRememberMe(isSmall),
+        _buildForgotPassword(isSmall),
       ],
     );
   }
 
-  Widget _buildRememberMe() {
+  Widget _buildRememberMe(bool isSmall) {
     return Row(
       children: [
         SizedBox(
-          width: 22,
-          height: 22,
+          width: isSmall ? 18.0 : 22.0,
+          height: isSmall ? 18.0 : 22.0,
           child: Checkbox(
             value: _rememberMe,
             onChanged: (value) {
@@ -653,17 +622,17 @@ class _LoginScreenState extends State<LoginScreen>
             activeColor: secondary,
             checkColor: Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(isSmall ? 4.0 : 6.0),
             ),
-            side: BorderSide(color: borderColor, width: 2),
+            side: BorderSide(color: borderColor, width: 1.5),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: isSmall ? 6.0 : 10.0),
         Text(
           'Recordarme',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: isSmall ? 12.0 : 14.0,
             color: textSecondary,
             fontWeight: FontWeight.w500,
           ),
@@ -672,7 +641,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildForgotPassword() {
+  Widget _buildForgotPassword(bool isSmall) {
     return TextButton(
       onPressed: _irARecuperarPassword,
       style: TextButton.styleFrom(
@@ -681,52 +650,56 @@ class _LoginScreenState extends State<LoginScreen>
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       child: Text(
-        '¿Olvidaste tu contraseña?',
+        'Olvidaste tu contraseña?',
         style: TextStyle(
           color: secondary,
           fontWeight: FontWeight.w600,
-          fontSize: 14,
+          fontSize: isSmall ? 12.0 : 14.0,
           letterSpacing: 0.2,
         ),
       ),
     );
   }
 
-  Widget _buildLoginButton() {
+  // ==================== LOGIN BUTTON ====================
+  Widget _buildLoginButton(double height, bool isSmall) {
     return SizedBox(
-      height: 58,
+      height: height,
       child: ElevatedButton(
         onPressed: _isLoading ? null : () => _login(),
         style: ElevatedButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(isSmall ? 12.0 : 16.0),
           ),
           elevation: 0,
           disabledBackgroundColor: textHint.withOpacity(0.3),
         ),
         child: _isLoading
             ? SizedBox(
-                height: 26,
-                width: 26,
+                height: isSmall ? 20.0 : 26.0,
+                width: isSmall ? 20.0 : 26.0,
                 child: CircularProgressIndicator(
-                  strokeWidth: 3,
+                  strokeWidth: 2.5,
                   color: Colors.white,
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.login_rounded, size: 24, color: Colors.white),
-                  SizedBox(width: 12),
+                children: [
+                  Icon(
+                    Icons.login_rounded,
+                    size: isSmall ? 18.0 : 24.0,
+                    color: Colors.white,
+                  ),
+                  SizedBox(width: isSmall ? 8.0 : 12.0),
                   Text(
-                    'Iniciar Sesión',
+                    'Iniciar Sesion',
                     style: TextStyle(
-                      fontSize: 17,
+                      fontSize: isSmall ? 14.0 : 17.0,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ],
@@ -735,22 +708,23 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildBiometricButton() {
+  // ==================== BIOMETRIC BUTTON ====================
+  Widget _buildBiometricButton(double height, bool isSmall) {
     return SizedBox(
-      height: 56,
+      height: height,
       child: OutlinedButton(
         onPressed: _isBiometricLoading ? null : _loginConBiometria,
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: secondary.withOpacity(0.3), width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(isSmall ? 12.0 : 16.0),
           ),
           backgroundColor: Colors.white,
         ),
         child: _isBiometricLoading
             ? SizedBox(
-                height: 24,
-                width: 24,
+                height: isSmall ? 18.0 : 24.0,
+                width: isSmall ? 18.0 : 24.0,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
                   color: secondary,
@@ -762,15 +736,15 @@ class _LoginScreenState extends State<LoginScreen>
                   Icon(
                     Platform.isIOS ? Icons.face_rounded : Icons.fingerprint,
                     color: secondary,
-                    size: 26,
+                    size: isSmall ? 20.0 : 26.0,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: isSmall ? 8.0 : 12.0),
                   Text(
                     Platform.isIOS
                         ? 'Acceder con Face ID'
                         : 'Acceder con Huella',
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: isSmall ? 13.0 : 15.0,
                       fontWeight: FontWeight.w600,
                       color: textSecondary,
                       letterSpacing: 0.2,
@@ -782,94 +756,96 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildDivider() {
+  // ==================== DIVIDER ====================
+  Widget _buildDivider(bool isSmall) {
     return Row(
       children: [
-        Expanded(child: Container(height: 1.5, color: borderColor)),
+        Expanded(child: Container(height: 1, color: borderColor)),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: isSmall ? 12.0 : 20.0),
           child: Text(
-            'O continúa con',
+            'O continua con',
             style: TextStyle(
               color: textSecondary.withOpacity(0.4),
-              fontSize: 13,
+              fontSize: isSmall ? 11.0 : 13.0,
               fontWeight: FontWeight.w500,
-              letterSpacing: 0.5,
+              letterSpacing: 0.3,
             ),
           ),
         ),
-        Expanded(child: Container(height: 1.5, color: borderColor)),
+        Expanded(child: Container(height: 1, color: borderColor)),
       ],
     );
   }
 
-  // Nuevo widget: Solo botón de Google
-  Widget _buildGoogleButtonOnly() {
-    return Center(
-      child: SizedBox(
-        height: 52,
-        width: double.infinity,
-        child: OutlinedButton(
-          onPressed: () {
-            _mostrarMensaje('Próximamente disponible', Colors.orange);
-          },
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: borderColor, width: 1.5),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            backgroundColor: Colors.white,
+  // ==================== GOOGLE BUTTON ONLY ====================
+  Widget _buildGoogleButtonOnly(double height, bool isSmall) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: () {
+          _mostrarMensaje('Proximamente disponible', Colors.orange);
+        },
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: borderColor, width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isSmall ? 10.0 : 14.0),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildGoogleIcon(),
-              const SizedBox(width: 10),
-              Text(
-                'Continuar con Google',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: textSecondary,
-                  letterSpacing: 0.2,
-                ),
+          padding: EdgeInsets.symmetric(vertical: isSmall ? 4.0 : 8.0),
+          backgroundColor: Colors.white,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildGoogleIcon(isSmall),
+            SizedBox(width: isSmall ? 6.0 : 10.0),
+            Text(
+              'Continuar con Google',
+              style: TextStyle(
+                fontSize: isSmall ? 12.0 : 14.0,
+                fontWeight: FontWeight.w600,
+                color: textSecondary,
+                letterSpacing: 0.2,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSocialButtons() {
+  // ==================== SOCIAL BUTTONS ====================
+  Widget _buildSocialButtons(double height, bool isSmall) {
     return Row(
       children: [
         Expanded(
           child: _buildSocialButton(
-            icon: _buildGoogleIcon(),
+            icon: _buildGoogleIcon(isSmall),
             label: 'Google',
+            isSmall: isSmall,
             onPressed: () {
-              _mostrarMensaje('Próximamente disponible', Colors.orange);
+              _mostrarMensaje('Proximamente disponible', Colors.orange);
             },
           ),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: isSmall ? 10.0 : 14.0),
         Expanded(
           child: _buildSocialButton(
             icon: Icon(
               Icons.fingerprint,
               color: _biometricAvailable ? secondary : textSecondary,
-              size: 26,
+              size: isSmall ? 20.0 : 26.0,
             ),
             label: 'Huella',
+            isSmall: isSmall,
             onPressed: _biometricAvailable
                 ? _loginConBiometria
                 : () {
                     _mostrarMensaje(
                       _biometricAvailable
-                          ? 'Habilita la biometría en tu perfil primero'
-                          : 'Tu dispositivo no soporta biometría',
+                          ? 'Habilita la biometria en tu perfil primero'
+                          : 'Tu dispositivo no soporta biometria',
                       Colors.orange,
                     );
                   },
@@ -882,29 +858,30 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildSocialButton({
     required Widget icon,
     required String label,
+    required bool isSmall,
     required VoidCallback onPressed,
   }) {
     return SizedBox(
-      height: 52,
+      height: isSmall ? 44.0 : 52.0,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: borderColor, width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(isSmall ? 10.0 : 14.0),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: EdgeInsets.symmetric(vertical: isSmall ? 4.0 : 8.0),
           backgroundColor: Colors.white,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             icon,
-            const SizedBox(width: 10),
+            SizedBox(width: isSmall ? 6.0 : 10.0),
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: isSmall ? 12.0 : 14.0,
                 fontWeight: FontWeight.w600,
                 color: textSecondary,
                 letterSpacing: 0.2,
@@ -916,10 +893,11 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildGoogleIcon() {
+  // ==================== GOOGLE ICON ====================
+  Widget _buildGoogleIcon(bool isSmall) {
     return Container(
-      width: 24,
-      height: 24,
+      width: isSmall ? 18.0 : 24.0,
+      height: isSmall ? 18.0 : 24.0,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.white,
@@ -928,82 +906,83 @@ class _LoginScreenState extends State<LoginScreen>
         child: Text(
           'G',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: isSmall ? 12.0 : 16.0,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF4285F4),
+            color: const Color(0xFF4285F4),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildFooter() {
+  // ==================== FOOTER ====================
+  Widget _buildFooter(bool isSmall) {
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
                 color: secondary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
                 'v3.0.0',
                 style: TextStyle(
                   color: secondary.withOpacity(0.6),
-                  fontSize: 11,
+                  fontSize: isSmall ? 9.0 : 11.0,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Container(
-              width: 4,
-              height: 4,
+              width: 3,
+              height: 3,
               decoration: BoxDecoration(
                 color: textSecondary.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Text(
               'Secure Login',
               style: TextStyle(
                 color: textSecondary.withOpacity(0.4),
-                fontSize: 12,
+                fontSize: isSmall ? 10.0 : 12.0,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Container(
-              width: 4,
-              height: 4,
+              width: 3,
+              height: 3,
               decoration: BoxDecoration(
                 color: textSecondary.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Text(
               '2FA',
               style: TextStyle(
                 color: secondary.withOpacity(0.4),
-                fontSize: 12,
+                fontSize: isSmall ? 10.0 : 12.0,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
-          '© 2026 Asistencia Virtual Pro',
+          '2026 Asistencia Virtual Pro',
           style: TextStyle(
             color: textSecondary.withOpacity(0.15),
-            fontSize: 11,
+            fontSize: isSmall ? 9.0 : 11.0,
             fontWeight: FontWeight.w400,
-            letterSpacing: 0.3,
+            letterSpacing: 0.2,
           ),
         ),
       ],

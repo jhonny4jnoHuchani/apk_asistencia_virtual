@@ -110,9 +110,11 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
         _tiempoRetrasoEntrada = Duration.zero;
       }
 
-      // Rango para entrada: 30 minutos antes y 30 minutos después
-      final entradaAntes = inicio.subtract(const Duration(minutes: 30));
-      final entradaDespues = inicio.add(const Duration(minutes: 30));
+      // Rango para entrada: 30 minutos antes y 50 minutos después
+      final entradaAntes =
+          inicio.subtract(const Duration(minutes: 30)); // 30 minutos antes
+      final entradaDespues =
+          inicio.add(const Duration(minutes: 150)); // 50 minutos después
 
       _puedeMarcarEntrada = !widget.horario.yaMarcoEntrada &&
           ahora.isAfter(entradaAntes) &&
