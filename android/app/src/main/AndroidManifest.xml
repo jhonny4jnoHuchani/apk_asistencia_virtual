@@ -19,6 +19,15 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         
+        <!-- API KEY DE GOOGLE MAPS (CORREGIDA) -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyDyT3XQPj6XQ4VwvWkeGT1Z745XS2PPfHA"/>
+        
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version"/>
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -31,9 +40,9 @@
             
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme" />
+                android:resource="@style/NormalTheme"/>
             
-            <!--  INTENT-FILTER PARA DEEP LINKING -->
+            <!-- INTENT-FILTER PARA DEEP LINKING -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -41,7 +50,7 @@
                 <data android:scheme="asistencia" android:host="reset-password" />
             </intent-filter>
             
-            <!--  INTENT-FILTER PARA LAUNCHER (separado) -->
+            <!-- INTENT-FILTER PARA LAUNCHER (separado) -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

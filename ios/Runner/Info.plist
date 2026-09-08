@@ -27,6 +27,12 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
+
+	<!-- Agrega estas claves -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Necesitamos tu ubicación para mostrar tu posición en el mapa</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Necesitamos tu ubicación para mostrar tu posición en el mapa</string>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>

@@ -5,6 +5,7 @@ A new Flutter project.
 ## Getting Started
 
 This project is a starting point for a Flutter application.
+android:value="AIzaSyDyT3XQPj6XQ4VwvWkeGT1Z745XS2PPfHA"
 
 A few resources to get you started if this is your first Flutter project:
 
@@ -17,6 +18,7 @@ For help getting started with Flutter development, view the
 samples, guidance on mobile development, and a full API reference.
 
 # comandos para ejecutar
+
 flutter clean
 flutter pub get
 flutter run

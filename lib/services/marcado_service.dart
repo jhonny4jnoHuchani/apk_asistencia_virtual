@@ -60,10 +60,7 @@ class MarcadoService {
     }
   }
 
-
-
-
-    // Marcar salida
+  // Marcar salida
   Future<void> marcarSalida({
     required int horarioId,
     required double latitud,
@@ -114,8 +111,6 @@ class MarcadoService {
       rethrow;
     }
   }
-
-
 
   // Historial con filtros
   Future<List<Marcado>> getHistorial({DateTime? fecha, int? mes}) async {

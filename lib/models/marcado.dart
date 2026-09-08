@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class Marcado {
   final int id;
   final int horarioId;
@@ -13,6 +15,9 @@ class Marcado {
   final String? estadoFacial;
   final int? minutosRetraso;
   final int? minutosAdelanto;
+  // NUEVOS CAMPOS PARA EL HORARIO
+  final String? horaInicio;
+  final String? horaFin;
 
   Marcado({
     required this.id,
@@ -29,6 +34,8 @@ class Marcado {
     this.estadoFacial,
     this.minutosRetraso,
     this.minutosAdelanto,
+    this.horaInicio,
+    this.horaFin,
   });
 
   factory Marcado.fromJson(Map<String, dynamic> json) {
@@ -40,9 +47,21 @@ class Marcado {
       String materiaNombre = 'Sin materia';
       String paraleloNombre = 'Sin paralelo';
       String? ubicacionNombre;
+      String? horaInicio;
+      String? horaFin;
 
       if (horario != null) {
         print('Horario encontrado');
+
+        // Obtener hora inicio y fin del horario
+        if (horario['hora_inicio'] != null) {
+          horaInicio = horario['hora_inicio'];
+          print('Hora inicio: $horaInicio');
+        }
+        if (horario['hora_fin'] != null) {
+          horaFin = horario['hora_fin'];
+          print('Hora fin: $horaFin');
+        }
 
         final paraleloMateria = horario['paralelo_materia'];
         if (paraleloMateria != null) {
@@ -76,6 +95,8 @@ class Marcado {
         materiaNombre = json['materia'] ?? 'Sin materia';
         paraleloNombre = json['paralelo'] ?? 'Sin paralelo';
         ubicacionNombre = json['ubicacion_nombre'] ?? json['ubicacion'];
+        horaInicio = json['hora_inicio'];
+        horaFin = json['hora_fin'];
       }
 
       DateTime fechaParsed;
@@ -88,7 +109,7 @@ class Marcado {
         fechaParsed = DateTime.now();
       }
 
-      // 🔥 CORREGIDO: Parsear latitud y longitud
+      // Parsear latitud
       double? latitud;
       if (json['latitud'] != null) {
         final latitudValue = json['latitud'];
@@ -102,6 +123,7 @@ class Marcado {
         print('Latitud parseada: $latitud');
       }
 
+      // Parsear longitud
       double? longitud;
       if (json['longitud'] != null) {
         final longitudValue = json['longitud'];
@@ -115,7 +137,7 @@ class Marcado {
         print('Longitud parseada: $longitud');
       }
 
-      // 🔥 CORREGIDO: Parsear minutos
+      // Parsear minutos de retraso
       int? minutosRetraso;
       if (json['minutos_retraso'] != null) {
         final value = json['minutos_retraso'];
@@ -130,6 +152,7 @@ class Marcado {
         print('minutosRetraso: $minutosRetraso');
       }
 
+      // Parsear minutos de adelanto
       int? minutosAdelanto;
       if (json['minutos_adelanto'] != null) {
         final value = json['minutos_adelanto'];
@@ -159,6 +182,8 @@ class Marcado {
         estadoFacial: json['estado'],
         minutosRetraso: minutosRetraso,
         minutosAdelanto: minutosAdelanto,
+        horaInicio: horaInicio,
+        horaFin: horaFin,
       );
 
       print('Marcado parseado exitosamente:');
@@ -167,14 +192,37 @@ class Marcado {
       print('  paralelo: ${marcado.paralelo}');
       print('  tipo: ${marcado.tipo}');
       print('  estado: ${marcado.estado}');
+      print('  horaInicio: ${marcado.horaInicio}');
+      print('  horaFin: ${marcado.horaFin}');
       print('===========================');
 
       return marcado;
     } catch (e) {
       print('ERROR al parsear Marcado: $e');
-      print('JSON que causó el error: $json');
+      print('JSON que causo el error: $json');
       rethrow;
     }
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'horario_id': horarioId,
+      'fecha': fecha.toIso8601String(),
+      'hora_marcado': hora,
+      'tipo_marcado': tipo,
+      'materia': materia,
+      'paralelo': paralelo,
+      'ubicacion': ubicacion,
+      'estado_asistencia': estado,
+      'latitud': latitud,
+      'longitud': longitud,
+      'estado_facial': estadoFacial,
+      'minutos_retraso': minutosRetraso,
+      'minutos_adelanto': minutosAdelanto,
+      'hora_inicio': horaInicio,
+      'hora_fin': horaFin,
+    };
   }
 
   bool get esPuntual => estado.toLowerCase() == 'puntual';
@@ -188,5 +236,62 @@ class Marcado {
       return 'Adelanto ${minutosAdelanto ?? 0} min';
     }
     return 'Puntual';
+  }
+
+  // Nuevos getters para el historial
+  String get horaInicioDisplay => horaInicio ?? '--:--';
+  String get horaFinDisplay => horaFin ?? '--:--';
+  String get horarioCompleto => '${horaInicioDisplay} - ${horaFinDisplay}';
+
+  // Calcular diferencia en minutos entre la hora real y la programada
+  int? get diferenciaMinutos {
+    if (horaInicio == null) return null;
+    try {
+      final horaRealParts = hora.split(':');
+      final horaProgParts = horaInicio!.split(':');
+
+      if (horaRealParts.length == 2 && horaProgParts.length == 2) {
+        final realMinutos =
+            int.parse(horaRealParts[0]) * 60 + int.parse(horaRealParts[1]);
+        final progMinutos =
+            int.parse(horaProgParts[0]) * 60 + int.parse(horaProgParts[1]);
+        return realMinutos - progMinutos;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Obtener el estado con el formato adecuado
+  String get estadoFormateado {
+    if (esPuntual) return 'Puntual';
+    if (esRetraso) return 'Retraso';
+    if (esAdelanto) return 'Adelanto';
+    return estado;
+  }
+
+  // Obtener el color del estado
+  Color get estadoColor {
+    if (esPuntual) return const Color(0xFF34C759); // Verde iOS
+    if (esRetraso) return const Color(0xFFFF9500); // Naranja iOS
+    if (esAdelanto) return const Color(0xFFFF3B30); // Rojo iOS
+    return const Color(0xFF8E8E93); // Gris iOS
+  }
+
+  // Icono del estado
+  IconData get estadoIcon {
+    if (esPuntual) return Icons.check_circle_rounded;
+    if (esRetraso) return Icons.warning_amber_rounded;
+    if (esAdelanto) return Icons.timer_rounded;
+    return Icons.help_rounded;
+  }
+
+  // Formatear diferencia para mostrar
+  String get diferenciaDisplay {
+    final diff = diferenciaMinutos;
+    if (diff == null) return '';
+    if (diff == 0) return '';
+    return diff > 0 ? '+$diff min' : '$diff min';
   }
 }

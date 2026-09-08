@@ -1,4 +1,4 @@
-// widgets/home/home_app_bar.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -17,235 +17,297 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onHelp,
   });
 
-  // Constantes para colores (evita recrear objetos)
-  static const _gradientColors = [
-    Color(0xFF6C63FF),
-    Color(0xFF00D4FF),
-  ];
-
-  static const _primaryColor = Color(0xFF6C63FF);
-  static const _secondaryColor = Color(0xFF00D4FF);
-  static const _dangerColor = Color(0xFFFF6B6B);
-  static const _darkColor = Color(0xFF1A1A2E);
+  // Colores estilo iOS moderno
+  static const Color _primaryBlue = Color(0xFF007AFF);
+  static const Color _primaryPurple = Color(0xFF5856D6);
+  static const Color _successGreen = Color(0xFF34C759);
+  static const Color _warningOrange = Color(0xFFFF9500);
+  static const Color _dangerRed = Color(0xFFFF3B30);
+  static const Color _iosGray = Color(0xFF8E8E93);
+  static const Color _iosLightGray = Color(0xFFF2F2F7);
+  static const Color _textPrimary = Color(0xFF1C1C1E);
+  static const Color _textSecondary = Color(0xFF3C3C43);
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title: _buildTitle(),
       backgroundColor: Colors.white,
-      foregroundColor: _darkColor,
+      foregroundColor: _textPrimary,
       elevation: 0,
       centerTitle: false,
-      bottom: _buildBottomGradient(),
-      actions: _buildActions(),
+      title: _buildTitle(),
+      actions: _buildActions(context),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(0.5),
+        child: Container(
+          height: 0.5,
+          color: const Color(0xFFE5E5EA),
+        ),
+      ),
     );
   }
 
   // ==================== TITLE ====================
   Widget _buildTitle() {
     return Row(
-      mainAxisSize:
-          MainAxisSize.min, // Importante: no ocupa más espacio del necesario
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _buildLogo(),
-        const SizedBox(width: 12),
-        _buildTitleText(),
+        _buildAppLogo(),
+        const SizedBox(width: 10),
+        _buildAppTitle(),
       ],
     );
   }
 
-  Widget _buildLogo() {
+  Widget _buildAppLogo() {
     return Container(
-      width: 40,
-      height: 40,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: _gradientColors,
+        gradient: LinearGradient(
+          colors: [_primaryBlue, _primaryPurple],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: _primaryColor.withOpacity(0.4),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: _secondaryColor.withOpacity(0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 2),
+            color: _primaryBlue.withOpacity(0.3),
+            blurRadius: 10,
+            spreadRadius: 1,
           ),
         ],
       ),
       child: const Center(
         child: Icon(
-          Icons.bolt_rounded,
+          Icons.fingerprint_rounded,
           color: Colors.white,
-          size: 22,
+          size: 20,
         ),
       ),
     );
   }
 
-  Widget _buildTitleText() {
-    return ShaderMask(
-      shaderCallback: (bounds) => const LinearGradient(
-        colors: _gradientColors,
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(bounds),
-      child: const Text(
-        'Control Docente',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-          color: Colors.white,
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
-  }
-
-  // ==================== BOTTOM ====================
-  PreferredSizeWidget _buildBottomGradient() {
-    return PreferredSize(
-      preferredSize: const Size.fromHeight(2),
-      child: Container(
-        height: 2,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [
-              _primaryColor,
-              _secondaryColor,
-              _primaryColor,
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
+  Widget _buildAppTitle() {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Asistencia',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: _textPrimary,
+            letterSpacing: -0.5,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: _primaryColor.withOpacity(0.3),
-              blurRadius: 8,
-            ),
-          ],
         ),
-      ),
+        Text(
+          'Control Biométrico',
+          style: TextStyle(
+            fontWeight: FontWeight.w400,
+            fontSize: 10,
+            color: _iosGray,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
     );
   }
 
   // ==================== ACTIONS ====================
-  List<Widget> _buildActions() {
+  List<Widget> _buildActions(BuildContext context) {
     return [
-      // Botón de ayuda (descomentar si se necesita)
-      // if (onHelp != null)
-      //   _buildActionButton(
-      //     icon: Icons.help_outline_rounded,
-      //     onPressed: onHelp!,
-      //     color: Colors.grey.shade400,
-      //     tooltip: 'Ayuda',
-      //     glowColor: Colors.grey.shade400,
-      //   ),
-
-      // Botón de registro facial (descomentar si se necesita)
+      // Registro Facial
       // _buildActionButton(
       //   icon: Icons.face_rounded,
       //   onPressed: onRegistroFacial,
-      //   color: _primaryColor,
       //   tooltip: 'Registro Facial',
-      //   glowColor: _primaryColor,
-      //   isPrimary: true,
+      //   color: _primaryBlue,
+      //   showBadge: false,
       // ),
+      // const SizedBox(width: 2),
 
+      // Historial
       _buildActionButton(
         icon: Icons.history_rounded,
         onPressed: onHistorial,
-        color: Colors.grey.shade600,
         tooltip: 'Historial',
-        glowColor: _secondaryColor,
+        color: _primaryPurple,
+        showBadge: false,
       ),
+      const SizedBox(width: 2),
+
+      // Perfil
       _buildActionButton(
         icon: Icons.person_rounded,
         onPressed: onPerfil,
-        color: Colors.grey.shade600,
         tooltip: 'Perfil',
-        glowColor: _primaryColor,
+        color: _successGreen,
+        showBadge: false,
       ),
+      const SizedBox(width: 2),
+
+      // Ayuda (nuevo)
+      // _buildActionButton(
+      //   icon: Icons.help_rounded,
+      //   onPressed: onHelp ?? () => _showComingSoon(context),
+      //   tooltip: 'Ayuda',
+      //   color: _warningOrange,
+      //   showBadge: true,
+      //   comingSoon: true,
+      // ),
+      // const SizedBox(width: 2),
+
+      // Cerrar Sesión
       _buildActionButton(
         icon: Icons.logout_rounded,
         onPressed: onLogout,
-        color: _dangerColor,
         tooltip: 'Cerrar sesión',
-        glowColor: _dangerColor,
+        color: _dangerRed,
+        showBadge: false,
+        isDanger: true,
       ),
+      const SizedBox(width: 4),
     ];
   }
 
-  // ==================== ACTION BUTTON ====================
+  // ==================== BOTON ACCIÓN ====================
   Widget _buildActionButton({
     required IconData icon,
     required VoidCallback onPressed,
-    required Color color,
     required String tooltip,
-    required Color glowColor,
-    bool isPrimary = false,
+    required Color color,
+    bool showBadge = false,
+    bool comingSoon = false,
+    bool isDanger = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: isPrimary
-              ? [
-                  BoxShadow(
-                    color: glowColor.withOpacity(0.3),
-                    blurRadius: 12,
-                    spreadRadius: 2,
+    return Tooltip(
+      message: comingSoon ? '$tooltip (Próximamente)' : tooltip,
+      child: Stack(
+        alignment: Alignment.topRight,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(12),
+              splashColor: color.withOpacity(0.15),
+              highlightColor: color.withOpacity(0.08),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDanger
+                        ? color.withOpacity(0.3)
+                        : color.withOpacity(0.15),
+                    width: 1,
                   ),
-                ]
-              : [
-                  BoxShadow(
-                    color: glowColor.withOpacity(0.1),
-                    blurRadius: 8,
+                  color: isDanger
+                      ? color.withOpacity(0.05)
+                      : color.withOpacity(0.04),
+                ),
+                child: Icon(
+                  icon,
+                  color: isDanger ? color : color,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+          // Badge de "Próximamente"
+          if (comingSoon)
+            Positioned(
+              top: 2,
+              right: 2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                decoration: BoxDecoration(
+                  color: _warningOrange,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: const Text(
+                  '!',
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
-                ],
+                ),
+              ),
+            ),
+          // Badge de notificación
+          if (showBadge && !comingSoon)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: _dangerRed,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== DIÁLOGO "PRÓXIMAMENTE" ====================
+  void _showComingSoon(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: IconButton(
-          onPressed: onPressed,
-          icon: _buildButtonIcon(icon, color, isPrimary),
-          tooltip: tooltip,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(
-            minWidth: 48,
-            minHeight: 48,
+        title: Row(
+          children: [
+            Icon(Icons.construction_rounded, color: _warningOrange, size: 28),
+            const SizedBox(width: 12),
+            const Text(
+              'Próximamente',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: _textPrimary,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Esta funcionalidad estará disponible pronto.\n'
+          'Estamos trabajando para ofrecerte la mejor experiencia.',
+          style: TextStyle(
+            fontSize: 14,
+            color: _textSecondary,
+            height: 1.5,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildButtonIcon(IconData icon, Color color, bool isPrimary) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isPrimary ? color.withOpacity(0.1) : Colors.transparent,
-        border: isPrimary
-            ? null
-            : Border.all(
-                color: color.withOpacity(0.2),
-                width: 1.5,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: _primaryBlue,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-      ),
-      child: Icon(
-        icon,
-        color: color,
-        size: isPrimary ? 22 : 20,
+            ),
+            child: const Text(
+              'Entendido',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // ==================== PREFERRED SIZE ====================
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 2);
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 0.5);
 }

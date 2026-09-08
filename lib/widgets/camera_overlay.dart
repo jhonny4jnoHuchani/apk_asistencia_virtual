@@ -25,26 +25,13 @@ class CameraOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Líneas de guía
         ..._buildVerticalLines(),
         ..._buildHorizontalLines(),
-
-        // Puntos de intersección
         ..._buildIntersectionPoints(),
-
-        // Esquinas decorativas
         ..._buildCornerIndicators(),
-
-        // Marco ovalado para el rostro
         _buildFaceGuide(),
-
-        // Icono central
         _buildCenterIcon(),
-
-        // Indicador de captura
         if (isCapturing) _buildCaptureIndicator(),
-
-        // Texto de estado
         if (isComplete) _buildCompleteText(),
       ],
     );
@@ -183,7 +170,6 @@ class CameraOverlay extends StatelessWidget {
   }
 
   Widget _buildFaceGuide() {
-    // Guía ovalada para el rostro
     final ovalWidth = width * 0.45;
     final ovalHeight = height * 0.45;
 
@@ -214,40 +200,49 @@ class CameraOverlay extends StatelessWidget {
   }
 
   Widget _buildCenterIcon() {
+    final isSmall = width < 360;
+    final iconSize = isSmall ? 28.0 : 32.0;
+    final padding = isSmall ? 10.0 : 12.0;
+    final borderRadius = isSmall ? 40.0 : 50.0;
+
     return Center(
       child: AnimatedOpacity(
         opacity: isComplete ? 0.0 : 1.0,
-        duration: const Duration(milliseconds: 500),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(60),
-            border: Border.all(
-              color: isCapturing
-                  ? posicionColor.withOpacity(0.5)
-                  : Colors.white.withOpacity(0.15),
-              width: 2,
+        duration: const Duration(milliseconds: 400),
+        child: AnimatedScale(
+          scale: isCapturing ? 1.1 : 1.0,
+          duration: const Duration(milliseconds: 300),
+          child: Container(
+            padding: EdgeInsets.all(padding),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(borderRadius),
+              border: Border.all(
+                color: isCapturing
+                    ? posicionColor.withOpacity(0.6)
+                    : Colors.white.withOpacity(0.2),
+                width: 1.5,
+              ),
+              boxShadow: isCapturing
+                  ? [
+                      BoxShadow(
+                        color: posicionColor.withOpacity(0.25),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : null,
             ),
-            boxShadow: isCapturing
-                ? [
-                    BoxShadow(
-                      color: posicionColor.withOpacity(0.3),
-                      blurRadius: 15,
-                      spreadRadius: 3,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Transform(
-            alignment: Alignment.center,
-            transform: _getTransformMatrix(),
-            child: Icon(
-              icono,
-              color: isCapturing
-                  ? posicionColor.withOpacity(0.8)
-                  : Colors.white.withOpacity(0.5),
-              size: 40,
+            child: Transform(
+              alignment: Alignment.center,
+              transform: _getTransformMatrix(),
+              child: Icon(
+                icono,
+                color: isCapturing
+                    ? posicionColor.withOpacity(0.9)
+                    : Colors.white.withOpacity(0.6),
+                size: iconSize,
+              ),
             ),
           ),
         ),
@@ -264,77 +259,87 @@ class CameraOverlay extends StatelessWidget {
   }
 
   Widget _buildCaptureIndicator() {
+    final isSmall = width < 360;
+    final size = isSmall ? 12.0 : 14.0;
+    final padding = isSmall ? 6.0 : 7.0;
     return Positioned(
-      bottom: 16,
-      right: 16,
+      bottom: isSmall ? 12 : 14,
+      right: isSmall ? 12 : 14,
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: EdgeInsets.all(padding),
         decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.8),
+          color: Colors.red.withOpacity(0.9),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.red.withOpacity(0.3),
-              blurRadius: 10,
-              spreadRadius: 2,
+              color: Colors.red.withOpacity(0.25),
+              blurRadius: 8,
+              spreadRadius: 1,
             ),
           ],
         ),
-        child: const SizedBox(
-          width: 16,
-          height: 16,
+        child: SizedBox(
+          width: size,
+          height: size,
           child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            strokeWidth: 1.5,
+            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
           ),
         ),
       ),
     );
   }
 
+  // ─── REGISTRO COMPLETADO CON BOTÓN MÁS PEQUEÑO ───
   Widget _buildCompleteText() {
+    final isSmall = width < 360;
+    final fontSize = isSmall ? 11.0 : 12.0;
+    final iconSize = isSmall ? 16.0 : 18.0;
+    final paddingH = isSmall ? 12.0 : 14.0;
+    final paddingV = isSmall ? 5.0 : 6.0;
+    final borderRadius = isSmall ? 14.0 : 16.0;
+
     return Positioned(
-      top: 16,
+      top: isSmall ? 12 : 16,
       left: 0,
       right: 0,
       child: Center(
         child: Transform(
           alignment: Alignment.center,
-          // Aplicar transformación inversa si es cámara frontal
           transform: isFrontCamera
               ? (Matrix4.identity()..scale(-1.0, 1.0, 1.0))
               : Matrix4.identity(),
           child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
+            padding: EdgeInsets.symmetric(
+              horizontal: paddingH,
+              vertical: paddingV,
             ),
             decoration: BoxDecoration(
               color: Colors.green.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(borderRadius),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.green.withOpacity(0.3),
-                  blurRadius: 10,
-                  spreadRadius: 2,
+                  color: Colors.green.withOpacity(0.2),
+                  blurRadius: 8,
+                  spreadRadius: 1,
                 ),
               ],
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   Icons.check_circle_rounded,
                   color: Colors.white,
-                  size: 20,
+                  size: iconSize,
                 ),
-                SizedBox(width: 8),
+                SizedBox(width: isSmall ? 4 : 6),
                 Text(
-                  'Registro Completo',
+                  'Registro Completado',
                   style: TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontSize: fontSize,
                   ),
                 ),
               ],

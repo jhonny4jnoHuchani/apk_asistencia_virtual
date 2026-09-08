@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart'; // NUEVO
 import '../../models/horario.dart';
 import 'package:flutter/cupertino.dart';
 
@@ -31,11 +30,8 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
   bool _puedeMarcarSalida = false;
   double _progreso = 0.0;
   bool _mostrarTemporizadorSalida = false;
-  bool _mostrarMapa = false; // NUEVO
 
-  GoogleMapController? _mapController; // NUEVO
-  LatLng? _coordenadas; // NUEVO
-
+  // COLORES iOS 17 COMPACTOS
   static const Color _iosBlue = Color(0xFF007AFF);
   static const Color _iosGreen = Color(0xFF34C759);
   static const Color _iosOrange = Color(0xFFFF9500);
@@ -48,34 +44,15 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
   @override
   void initState() {
     super.initState();
-    _parsearCoordenadas(); // NUEVO
     _calcularTiempos();
     _timer =
         Timer.periodic(const Duration(seconds: 1), (_) => _calcularTiempos());
   }
 
-  void _parsearCoordenadas() {
-    // NUEVO
-    if (widget.horario.ubicacion != null &&
-        widget.horario.ubicacion!.contains(',')) {
-      try {
-        final partes = widget.horario.ubicacion!.split(',');
-        final lat = double.parse(partes[0].trim());
-        final lng = double.parse(partes[1].trim());
-        _coordenadas = LatLng(lat, lng);
-      } catch (e) {
-        _coordenadas = null;
-      }
-    }
-  }
-
   @override
   void didUpdateWidget(covariant HorarioCardExtended oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.horario != widget.horario) {
-      _parsearCoordenadas();
-      _calcularTiempos();
-    }
+    if (oldWidget.horario != widget.horario) _calcularTiempos();
   }
 
   void _calcularTiempos() {
@@ -88,6 +65,7 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
           int.parse(horaInicioParts[0]), int.parse(horaInicioParts[1]));
       final fin = DateTime(hoy.year, hoy.month, hoy.day,
           int.parse(horaFinParts[0]), int.parse(horaFinParts[1]));
+
       double progreso = 0.0;
       final totalDuracion = fin.difference(inicio);
       if (!widget.horario.yaMarcoEntrada && totalDuracion.inSeconds > 0) {
@@ -102,6 +80,7 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
       } else if (widget.horario.estaCompletado) {
         progreso = 1.0;
       }
+
       Duration tiempoRestanteEntrada = Duration.zero;
       Duration tiempoRetrasoEntrada = Duration.zero;
       if (ahora.isBefore(inicio))
@@ -113,6 +92,7 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
       final puedeMarcarEntrada = !widget.horario.yaMarcoEntrada &&
           ahora.isAfter(entradaAntes) &&
           ahora.isBefore(entradaDespues);
+
       final mostrarTemporizadorSalida =
           widget.horario.yaMarcoEntrada && !widget.horario.yaMarcoSalida;
       Duration tiempoRestanteSalida = Duration.zero;
@@ -129,6 +109,7 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
           !widget.horario.yaMarcoSalida &&
           ahora.isAfter(salidaAntes) &&
           ahora.isBefore(salidaDespues);
+
       if (mounted) {
         setState(() {
           _progreso = progreso;
@@ -149,7 +130,6 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
   @override
   void dispose() {
     _timer?.cancel();
-    _mapController?.dispose();
     super.dispose();
   }
 
@@ -222,16 +202,19 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
   @override
   Widget build(BuildContext context) {
     return CupertinoCard(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 6), // REDUCIDO de 10 a 6
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // HEADER COMPACTO
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(
+              horizontal: 10, vertical: 8), // REDUCIDO de 12,10
           decoration: BoxDecoration(
             gradient: LinearGradient(
                 colors: _getColorHeader(),
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12)), // REDUCIDO de 14
           ),
           child: Row(children: [
             Expanded(
@@ -244,111 +227,66 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                             fontWeight: FontWeight.w700,
                             color: Colors.white),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                        overflow: TextOverflow.ellipsis), // 15 -> 14
                     const SizedBox(height: 1),
                     Text('Paralelo ${widget.horario.paralelo}',
                         style: const TextStyle(
-                            fontSize: 10.5, color: Colors.white70)),
+                            fontSize: 10.5,
+                            color: Colors.white70)), // 11 -> 10.5
                   ]),
             ),
             _buildBadgeEstado(),
           ]),
         ),
+
         Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(10), // REDUCIDO de 12
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // HORARIO Y UBICACION CON TAP
+            // HORARIO Y UBICACION
             Row(children: [
-              Icon(CupertinoIcons.clock, size: 12, color: _iosGray),
+              Icon(CupertinoIcons.clock, size: 12, color: _iosGray), // 13 -> 12
               const SizedBox(width: 3),
               Text('${widget.horario.horaInicio} - ${widget.horario.horaFin}',
                   style: TextStyle(
                       fontSize: 11.5,
                       color: Colors.black87,
-                      fontWeight: FontWeight.w500)),
+                      fontWeight: FontWeight.w500)), // 12 -> 11.5
               if (widget.horario.ubicacion != null) ...[
                 const SizedBox(width: 6),
                 Expanded(
-                  child: GestureDetector(
-                    // TAP PARA MOSTRAR MAPA
-                    onTap: () => setState(() => _mostrarMapa = !_mostrarMapa),
-                    child: Row(children: [
-                      Icon(
-                          _mostrarMapa
-                              ? CupertinoIcons.location_slash
-                              : CupertinoIcons.location,
-                          size: 11,
-                          color: _iosBlue),
-                      const SizedBox(width: 2),
-                      Expanded(
-                          child: Text(widget.horario.ubicacion!,
-                              style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: _iosBlue,
-                                  decoration: TextDecoration.underline),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis)),
-                      Icon(
-                          _mostrarMapa
-                              ? CupertinoIcons.chevron_up
-                              : CupertinoIcons.chevron_down,
-                          size: 10,
-                          color: _iosBlue),
-                    ]),
-                  ),
+                  child: Row(children: [
+                    Icon(CupertinoIcons.location,
+                        size: 11, color: _iosGray), // 12 -> 11
+                    const SizedBox(width: 2),
+                    Expanded(
+                        child: Text(widget.horario.ubicacion!,
+                            style: TextStyle(
+                                fontSize: 10.5, color: Colors.black54),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis)), // 11 -> 10.5
+                  ]),
                 ),
               ],
             ]),
 
-            // MAPA ESTILO UBER - SE EXPANDE
-            AnimatedSize(
-              // NUEVO
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              child: _mostrarMapa && _coordenadas != null
-                  ? Column(children: [
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SizedBox(
-                          height: 140,
-                          width: double.infinity,
-                          child: GoogleMap(
-                            initialCameraPosition:
-                                CameraPosition(target: _coordenadas!, zoom: 16),
-                            markers: {
-                              Marker(
-                                  markerId: const MarkerId('ubicacion'),
-                                  position: _coordenadas!),
-                            },
-                            zoomControlsEnabled: false,
-                            mapToolbarEnabled: false,
-                            myLocationButtonEnabled: false,
-                            onMapCreated: (controller) =>
-                                _mapController = controller,
-                          ),
-                        ),
-                      ),
-                    ])
-                  : const SizedBox.shrink(),
-            ),
-
+            // BARRA DE PROGRESO
             if (!widget.horario.estaCompletado) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 8), // 10 -> 8
               ClipRRect(
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(2), // 3 -> 2
                 child: LinearProgressIndicator(
                     value: _progreso,
                     minHeight: 3,
                     backgroundColor: _iosLightGray,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                        _progreso > 0.8 ? _iosGreen : _iosBlue)),
+                        _progreso > 0.8 ? _iosGreen : _iosBlue)), // 4 -> 3
               ),
             ],
 
+            // TEMPORIZADOR ENTRADA
             if (!widget.horario.yaMarcoEntrada) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 6), // 8 -> 6
               _buildEstadoContainer(
                   color: _getColorEstadoEntrada(),
                   icon: _getIconoEntrada(),
@@ -356,6 +294,7 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                   mostrarTarde: _tiempoRetrasoEntrada.inMinutes > 0),
             ],
 
+            // TEMPORIZADOR SALIDA
             if (_mostrarTemporizadorSalida) ...[
               const SizedBox(height: 6),
               _buildEstadoContainer(
@@ -365,8 +304,9 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                   mostrarTarde: _tiempoRetrasoSalida.inMinutes > 0),
             ],
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 10), // 12 -> 10
 
+            // BOTONES
             if (!widget.horario.estaCompletado)
               Row(children: [
                 if (!widget.horario.yaMarcoEntrada)
@@ -388,23 +328,24 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                           onPressed: () => _mostrarDialogoSalida(context))),
               ]),
 
+            // ESTADO COMPLETADO
             if (widget.horario.estaCompletado) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 8), // 10 -> 8
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(8), // 10 -> 8
                 decoration: BoxDecoration(
                     gradient: LinearGradient(
                         colors: [_iosGreen, _iosGreen.withOpacity(0.8)]),
-                    borderRadius: BorderRadius.circular(7)),
+                    borderRadius: BorderRadius.circular(7)), // 8 -> 7
                 child: Row(children: [
                   const Icon(CupertinoIcons.checkmark_circle_fill,
-                      color: Colors.white, size: 14),
-                  const SizedBox(width: 6),
+                      color: Colors.white, size: 14), // 16 -> 14
+                  const SizedBox(width: 6), // 8 -> 6
                   const Text('Asistencia completada',
                       style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white)),
+                          color: Colors.white)), // 12 -> 11.5
                   const Spacer(),
                   Container(
                       padding: const EdgeInsets.symmetric(
@@ -413,7 +354,7 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8)),
                       child: const Icon(CupertinoIcons.checkmark,
-                          color: Colors.white, size: 12)),
+                          color: Colors.white, size: 12)), // 14 -> 12
                 ]),
               ),
             ],
@@ -429,16 +370,17 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
       texto = 'Completado';
     else if (widget.horario.yaMarcoEntrada) texto = 'En curso';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 7, vertical: 2), // 8,3 -> 7,2
       decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12)),
+          borderRadius: BorderRadius.circular(12)), // 14 -> 12
       child: Text(texto,
           style: const TextStyle(
               fontSize: 8.5,
               fontWeight: FontWeight.w700,
               color: Colors.white,
-              letterSpacing: 0.2)),
+              letterSpacing: 0.2)), // 9 -> 8.5
     );
   }
 
@@ -448,20 +390,22 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
       required String texto,
       required bool mostrarTarde}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // 10,7 -> 8,6
       decoration: BoxDecoration(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(7),
-          border: Border.all(color: color.withOpacity(0.2), width: 0.5)),
+          border:
+              Border.all(color: color.withOpacity(0.2), width: 0.5)), // 8 -> 7
       child: Row(children: [
-        Icon(icon, color: color, size: 13),
-        const SizedBox(width: 5),
+        Icon(icon, color: color, size: 13), // 14 -> 13
+        const SizedBox(width: 5), // 6 -> 5
         Expanded(
             child: Text(texto,
                 style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    color: color))),
+                    color: color))), // 12 -> 11.5
         if (mostrarTarde)
           Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -472,7 +416,7 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
                   style: TextStyle(
                       fontSize: 7.5,
                       fontWeight: FontWeight.w600,
-                      color: color))),
+                      color: color))), // 8 -> 7.5
       ]),
     );
   }
@@ -493,23 +437,25 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
     return CupertinoButton(
       onPressed: disponible ? onPressed : null,
       padding: EdgeInsets.zero,
-      borderRadius: BorderRadius.circular(7),
+      borderRadius: BorderRadius.circular(7), // 8 -> 7
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        height: 32,
+        height: 32, // 36 -> 32
         decoration: BoxDecoration(
             color: disponible ? color : _iosLightGray,
             borderRadius: BorderRadius.circular(7),
             border: Border.all(
                 color: disponible ? color : _iosSeparator, width: 0.5)),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 14, color: disponible ? Colors.white : _iosGray),
-          const SizedBox(width: 4),
+          Icon(icon,
+              size: 14,
+              color: disponible ? Colors.white : _iosGray), // 15 -> 14
+          const SizedBox(width: 4), // 5 -> 4
           Text(texto,
               style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w600,
-                  color: disponible ? Colors.white : _iosGray)),
+                  color: disponible ? Colors.white : _iosGray)), // 12 -> 11.5
         ]),
       ),
     );
@@ -523,10 +469,12 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
         int.parse(horaFinParts[0]), int.parse(horaFinParts[1]));
     final diferencia = ahora.difference(fin);
     final minutosDiferencia = diferencia.inMinutes;
+
     String titulo = 'Confirmar Salida';
     String mensaje = '¿Desea marcar su salida ahora?';
     Color color = _iosBlue;
     IconData icono = CupertinoIcons.arrow_right_to_line_alt;
+
     if (minutosDiferencia < 0) {
       final minutosAntes = minutosDiferencia.abs();
       titulo = 'Salida Anticipada';
@@ -545,6 +493,7 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
       color = _iosOrange;
       icono = CupertinoIcons.timer;
     }
+
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
@@ -552,15 +501,16 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
           Icon(icono, color: color, size: 20),
           const SizedBox(width: 6),
           Text(titulo, style: const TextStyle(fontSize: 16))
-        ]),
+        ]), // 22 -> 20
         content: Column(children: [
-          const SizedBox(height: 5),
-          Text(mensaje, style: const TextStyle(fontSize: 13)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 5), // 6 -> 5
+          Text(mensaje, style: const TextStyle(fontSize: 13)), // NUEVO
+          const SizedBox(height: 8), // 10 -> 8
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8), // 10 -> 8
             decoration: BoxDecoration(
-                color: _iosLightGray, borderRadius: BorderRadius.circular(7)),
+                color: _iosLightGray,
+                borderRadius: BorderRadius.circular(7)), // 8 -> 7
             child: Column(children: [
               _buildInfoRowIOS('Materia', widget.horario.materia),
               _buildInfoRowIOS('Paralelo', widget.horario.paralelo),
@@ -592,18 +542,19 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended> {
 
   Widget _buildInfoRowIOS(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
+      padding: const EdgeInsets.symmetric(vertical: 1), // 2 -> 1
       child: Row(children: [
         SizedBox(
             width: 75,
-            child:
-                Text(label, style: TextStyle(fontSize: 10.5, color: _iosGray))),
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 10.5, color: _iosGray))), // 80,11 -> 75,10.5
         Expanded(
             child: Text(value,
                 style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w500,
-                    color: Colors.black))),
+                    color: Colors.black))), // 11 -> 10.5
       ]),
     );
   }
@@ -614,26 +565,28 @@ class CupertinoCard extends StatelessWidget {
   final EdgeInsetsGeometry margin;
   const CupertinoCard(
       {super.key, required this.child, this.margin = EdgeInsets.zero});
+
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: margin,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12), // 14 -> 12
         boxShadow: [
           BoxShadow(
               color: Colors.black.withOpacity(0.03),
               blurRadius: 8,
-              offset: const Offset(0, 1)),
+              offset: const Offset(0, 1)), // blur 10->8
           BoxShadow(
               color: Colors.black.withOpacity(0.01),
               blurRadius: 3,
-              offset: const Offset(0, 1)),
+              offset: const Offset(0, 1)), // blur 4->3
         ],
         border: Border.all(color: const Color(0xFFE5E5EA), width: 0.5),
       ),
-      child: ClipRRect(borderRadius: BorderRadius.circular(12), child: child),
+      child: ClipRRect(
+          borderRadius: BorderRadius.circular(12), child: child), // 14 -> 12
     );
   }
 }

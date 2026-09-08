@@ -321,123 +321,177 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
   void _mostrarOpcionesFoto(BuildContext context) {
     final hasPhoto = context.read<AuthProvider>().user?.fotoPerfilUrl != null;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
-      ),
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => SafeArea(
         child: SingleChildScrollView(
           physics: const ClampingScrollPhysics(),
           child: Padding(
             padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 8),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Indicador de arrastre
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
+                  const SizedBox(height: 16),
+
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
                           'Foto de perfil',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2D3436),
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            foregroundColor: Colors.grey[600],
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'Cerrar',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Divider(height: 24, thickness: 0.5),
+
+                  // Opciones
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        // Tomar foto
+                        _buildOptionSheet(
+                          icon: Icons.camera_alt_rounded,
+                          title: 'Tomar foto',
+                          subtitle: 'Usar la cámara del dispositivo',
+                          onTap: () {
+                            Navigator.pop(context);
+                            _tomarFoto();
+                          },
+                        ),
+                        const SizedBox(height: 4),
+
+                        // Seleccionar de galería
+                        _buildOptionSheet(
+                          icon: Icons.photo_library_rounded,
+                          title: 'Seleccionar de galería',
+                          subtitle: 'Elegir una foto existente',
+                          onTap: () {
+                            Navigator.pop(context);
+                            _seleccionarFoto();
+                          },
+                        ),
+                        const SizedBox(height: 4),
+
+                        if (hasPhoto) ...[
+                          // Ver foto
+                          _buildOptionSheet(
+                            icon: Icons.visibility_rounded,
+                            title: 'Ver foto',
+                            subtitle: 'Visualizar foto actual',
+                            onTap: () {
+                              Navigator.pop(context);
+                              _mostrarFotoCompleta(context);
+                            },
+                          ),
+                          const SizedBox(height: 4),
+
+                          // Eliminar foto
+                          _buildOptionSheet(
+                            icon: Icons.delete_outline_rounded,
+                            title: 'Eliminar foto',
+                            subtitle: 'Quitar la foto de perfil',
+                            isDestructive: true,
+                            onTap: () {
+                              Navigator.pop(context);
+                              _eliminarFoto();
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Botón Cancelar mejorado
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[100],
+                          foregroundColor: Colors.grey[700],
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: BorderSide(
+                              color: Colors.grey[200]!,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'Cancelar',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                            letterSpacing: 0.3,
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildOptionSheet(
-                        icon: Icons.camera_alt_rounded,
-                        title: 'Tomar foto',
-                        subtitle: 'Usar la cámara del dispositivo',
-                        onTap: () {
-                          Navigator.pop(context);
-                          _tomarFoto();
-                        },
-                      ),
-                      const Divider(height: 1),
-                      _buildOptionSheet(
-                        icon: Icons.photo_library_rounded,
-                        title: 'Seleccionar de galería',
-                        subtitle: 'Elegir una foto existente',
-                        onTap: () {
-                          Navigator.pop(context);
-                          _seleccionarFoto();
-                        },
-                      ),
-                      if (hasPhoto) ...[
-                        const Divider(height: 1),
-                        _buildOptionSheet(
-                          icon: Icons.visibility_rounded,
-                          title: 'Ver foto',
-                          subtitle: 'Visualizar foto actual',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _mostrarFotoCompleta(context);
-                          },
-                        ),
-                        const Divider(height: 1),
-                        _buildOptionSheet(
-                          icon: Icons.delete_rounded,
-                          title: 'Eliminar foto',
-                          subtitle: 'Quitar la foto de perfil',
-                          isDestructive: true,
-                          onTap: () {
-                            Navigator.pop(context);
-                            _eliminarFoto();
-                          },
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.grey[100],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text(
-                        'Cancelar',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black54,
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ),
@@ -452,57 +506,82 @@ class _PerfilScreenState extends State<PerfilScreen> {
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        splashColor: isDestructive
+            ? Colors.red.withOpacity(0.05)
+            : _primaryColor.withOpacity(0.05),
+        highlightColor: isDestructive
+            ? Colors.red.withOpacity(0.03)
+            : _primaryColor.withOpacity(0.03),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDestructive
+                  ? Colors.red.withOpacity(0.15)
+                  : Colors.grey.shade100,
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isDestructive
+                      ? Colors.red.withOpacity(0.08)
+                      : _primaryColor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: isDestructive ? Colors.red : _primaryColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDestructive
+                            ? Colors.red
+                            : const Color(0xFF2D3436),
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
                 color: isDestructive
-                    ? Colors.red.withOpacity(0.1)
-                    : _primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                    ? Colors.red.withOpacity(0.5)
+                    : Colors.grey[400],
               ),
-              child: Icon(
-                icon,
-                color: isDestructive ? Colors.red : _primaryColor,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: isDestructive ? Colors.red : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Colors.grey[400],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -826,68 +905,95 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Widget _buildInfoCard(dynamic user, AuthProvider authProvider) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _buildInfoRow(
-              icon: Icons.email_rounded,
-              label: 'Correo electrónico',
-              value: user.email,
-            ),
-            const Divider(height: 24),
-            _buildInfoRow(
-              icon: Icons.badge_rounded,
-              label: 'ID de docente',
-              value: user.id.toString(),
-            ),
-            const Divider(height: 24),
-            _buildInfoRow(
-              icon: Icons.face_retouching_natural_rounded,
-              label: 'Registro facial',
-              value: authProvider.registroFacialCompleto
-                  ? 'Completado'
-                  : 'Pendiente',
-              valueColor: authProvider.registroFacialCompleto
-                  ? _successColor
-                  : _warningColor,
-              showIcon: true,
-            ),
-            if (!authProvider.registroFacialCompleto) ...[
-              const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: authProvider.embeddingsCount / 50,
-                  backgroundColor: Colors.grey.shade200,
-                  color: _warningColor,
-                  minHeight: 8,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Progreso: ${authProvider.embeddingsCount} de 50 capturas',
-                style: const TextStyle(
-                  color: _textSecondary,
-                  fontSize: 13,
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        final isSmallScreen = screenWidth < 360;
+
+        final padding = isSmallScreen ? 14.0 : 20.0;
+        final radius = isSmallScreen ? 16.0 : 20.0;
+        final iconSize = isSmallScreen ? 18.0 : 22.0;
+        final labelSize = isSmallScreen ? 11.0 : 13.0;
+        final valueSize = isSmallScreen ? 13.0 : 15.0;
+        final dividerHeight = isSmallScreen ? 16.0 : 24.0;
+        final progressHeight = isSmallScreen ? 6.0 : 8.0;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(radius),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: isSmallScreen ? 6 : 10,
+                offset: const Offset(0, 2),
               ),
             ],
-          ],
-        ),
-      ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(padding),
+            child: Column(
+              children: [
+                _buildInfoRow(
+                  icon: Icons.email_rounded,
+                  label: 'Correo electrónico',
+                  value: user.email,
+                  iconSize: iconSize,
+                  labelSize: labelSize,
+                  valueSize: valueSize,
+                  isSmall: isSmallScreen,
+                ),
+                Divider(height: dividerHeight, thickness: 0.5),
+                _buildInfoRow(
+                  icon: Icons.badge_rounded,
+                  label: 'ID de docente',
+                  value: user.ci.toString(),
+                  iconSize: iconSize,
+                  labelSize: labelSize,
+                  valueSize: valueSize,
+                  isSmall: isSmallScreen,
+                ),
+                Divider(height: dividerHeight, thickness: 0.5),
+                _buildInfoRow(
+                  icon: Icons.face_retouching_natural_rounded,
+                  label: 'Registro facial',
+                  value: authProvider.registroFacialCompleto
+                      ? 'Completado'
+                      : 'Pendiente',
+                  valueColor: authProvider.registroFacialCompleto
+                      ? _successColor
+                      : _warningColor,
+                  showIcon: true,
+                  iconSize: iconSize,
+                  labelSize: labelSize,
+                  valueSize: valueSize,
+                  isSmall: isSmallScreen,
+                ),
+                if (!authProvider.registroFacialCompleto) ...[
+                  SizedBox(height: isSmallScreen ? 12 : 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value:
+                          (authProvider.embeddingsCount / 50).clamp(0.0, 1.0),
+                      backgroundColor: Colors.grey.shade200,
+                      color: _warningColor,
+                      minHeight: progressHeight,
+                    ),
+                  ),
+                  SizedBox(height: isSmallScreen ? 6 : 8),
+                  Text(
+                    'Progreso: ${authProvider.embeddingsCount} de 50 capturas',
+                    style: TextStyle(
+                        color: _textSecondary,
+                        fontSize: isSmallScreen ? 11 : 13),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1279,6 +1385,10 @@ class _PerfilScreenState extends State<PerfilScreen> {
     required String value,
     Color? valueColor,
     bool showIcon = false,
+    double iconSize = 22,
+    double labelSize = 13,
+    double valueSize = 15,
+    bool isSmall = false,
   }) {
     return Row(
       children: [
@@ -1288,7 +1398,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
             color: Colors.grey.shade100,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, size: 18, color: _textSecondary),
+          child: Icon(icon, size: iconSize, color: _textSecondary),
         ),
         const SizedBox(width: 12),
         Expanded(
