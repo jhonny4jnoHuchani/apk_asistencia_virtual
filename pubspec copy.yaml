@@ -1,4 +1,4 @@
-name: mi_control_upea
+name: asistencia_docente
 description: App de asistencia docente con reconocimiento facial
 publish_to: "none"
 version: 1.0.0+1
@@ -40,8 +40,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets: # <-- AGREGA ESTO
-    - assets/icon/icon.png
 
 flutter_launcher_icons:
   android: "launcher_icon"

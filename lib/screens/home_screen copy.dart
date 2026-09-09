@@ -27,25 +27,29 @@ import 'perfil_screen.dart';
 import 'registro_facial_screen.dart';
 
 // ============================================
-// FUNCIÓN PARA ISOLATE - PROCESAMIENTO DE IMAGEN (SIN RECORTE)
+// FUNCIÓN PARA ISOLATE - PROCESAMIENTO DE IMAGEN
 // ============================================
-Future<File> _processImageInIsolate(File originalFile) async {
+Future<File> _cropImageInIsolate(File originalFile) async {
+  // Crear un ReceivePort para recibir el resultado
   final receivePort = ReceivePort();
 
+  // Iniciar el isolate
   await Isolate.spawn(
-      _processImageIsolate, [receivePort.sendPort, originalFile.path]);
+      _cropImageIsolate, [receivePort.sendPort, originalFile.path]);
 
+  // Esperar el resultado
   final result = await receivePort.first as String;
   receivePort.close();
 
   return File(result);
 }
 
-void _processImageIsolate(List<dynamic> args) {
+void _cropImageIsolate(List<dynamic> args) {
   final SendPort sendPort = args[0];
   final String filePath = args[1];
 
   try {
+    // Procesar la imagen en el isolate
     final File file = File(filePath);
     final bytes = file.readAsBytesSync();
     final image = img.decodeImage(bytes);
@@ -55,41 +59,54 @@ void _processImageIsolate(List<dynamic> args) {
       return;
     }
 
-    // Redimensionar manteniendo proporción original
+    final originalWidth = image.width;
+    final originalHeight = image.height;
+    final targetRatio = 0.75;
+
+    int cropWidth, cropHeight, offsetX, offsetY;
+
+    if (originalWidth / originalHeight > targetRatio) {
+      cropHeight = originalHeight;
+      cropWidth = (originalHeight * targetRatio).round();
+      offsetX = ((originalWidth - cropWidth) / 2).round();
+      offsetY = 0;
+    } else {
+      cropWidth = originalWidth;
+      cropHeight = (originalWidth / targetRatio).round();
+      offsetX = 0;
+      offsetY = ((originalHeight - cropHeight) / 2).round();
+    }
+
+    final croppedImage = img.copyCrop(
+      image,
+      x: offsetX,
+      y: offsetY,
+      width: cropWidth,
+      height: cropHeight,
+    );
+
     final int maxWidth = 800;
-    final int maxHeight = 1066; // Mantiene proporción 3:4 aprox
-
-    img.Image resizedImage = image;
-
-    // Redimensionar manteniendo aspect ratio
-    if (image.width > maxWidth || image.height > maxHeight) {
-      final double widthRatio = maxWidth / image.width;
-      final double heightRatio = maxHeight / image.height;
-      final double scale = widthRatio < heightRatio ? widthRatio : heightRatio;
-
-      final newWidth = (image.width * scale).round();
-      final newHeight = (image.height * scale).round();
-
+    img.Image resizedImage = croppedImage;
+    if (croppedImage.width > maxWidth) {
       resizedImage = img.copyResize(
-        image,
-        width: newWidth,
-        height: newHeight,
+        croppedImage,
+        width: maxWidth,
+        height: (maxWidth / targetRatio).round(),
       );
     }
 
-    // Guardar imagen procesada
     final tempDir = Directory.systemTemp;
-    final processedPath =
-        '${tempDir.path}/processed_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final processedFile = File(processedPath);
-    processedFile.writeAsBytesSync(img.encodeJpg(resizedImage, quality: 85));
+    final croppedPath =
+        '${tempDir.path}/cropped_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final croppedFile = File(croppedPath);
+    croppedFile.writeAsBytesSync(img.encodeJpg(resizedImage, quality: 85));
 
     // Eliminar el archivo original
     try {
       file.deleteSync();
     } catch (_) {}
 
-    sendPort.send(processedPath);
+    sendPort.send(croppedPath);
   } catch (e) {
     sendPort.send(filePath);
   }
@@ -313,11 +330,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               (c) => c.lensDirection == CameraLensDirection.front,
               orElse: () => _cameras.first);
 
+      // Liberar cámara anterior si existe
       await _cameraController?.dispose();
 
       _cameraController = CameraController(
         camaraSeleccionada,
-        ResolutionPreset.high,
+        ResolutionPreset.low, // Usar resolución media para mejor rendimiento
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -336,9 +354,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  // ============================================
-  // CAPTURA Y PROCESAMIENTO SIN RECORTE
-  // ============================================
   Future<void> _capturarYMarcar() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return;
@@ -348,24 +363,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final XFile photo = await _cameraController!.takePicture();
 
       if (_etapaFoto == 'frontal') {
-        // Procesar imagen sin recortar
-        final processedFile = await _processImageInIsolate(File(photo.path));
-        _fotoFrontal = processedFile;
+        // Procesar en isolate
+        final croppedFile = await _cropImageInIsolate(File(photo.path));
+        _fotoFrontal = croppedFile;
         final instruccionGesto = _instruccionGesto(_gestoSolicitado!);
         await _switchToNextStage('gesto', instruccionGesto);
         return;
       }
 
       if (_etapaFoto == 'gesto') {
-        final processedFile = await _processImageInIsolate(File(photo.path));
-        _fotoGesto = processedFile;
+        final croppedFile = await _cropImageInIsolate(File(photo.path));
+        _fotoGesto = croppedFile;
         await _switchToNextStage(
-            'constancia', 'Ahora toma la foto de constancia');
+            'constancia', 'Ahora toma la foto de constancia (opcional)');
         return;
       }
 
-      // CONSTANCIA - procesar sin recorte
-      _fotoConstancia = await _processImageInIsolate(File(photo.path));
+      // CONSTANCIA - sin recorte
+      _fotoConstancia = File(photo.path);
 
       // Liberar cámara antes de enviar
       await _cameraController?.dispose();
@@ -394,6 +409,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _etapaFoto = nextStage;
       _isCameraReady = false;
     });
+    // Pequeña pausa para liberar recursos
     await Future.delayed(const Duration(milliseconds: 300));
     CustomSnackbar.showInfo(context, message);
     await _abrirCamara();
@@ -408,9 +424,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final horarioProvider = context.read<HorarioProvider>();
 
+    // Mostrar diálogo de carga con mensaje
     LoadingDialog.show(context, 'Procesando marcado...');
 
     try {
+      // Ejecutar en un futuro con timeout
       final marcadoFuture = _tipoMarcado == 'entrada'
           ? _marcadoService.marcarEntrada(
               horarioId: _horarioIdSeleccionado!,
@@ -436,6 +454,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onTimeout: () => throw Exception('Tiempo de espera agotado'),
       );
 
+      // Limpiar archivos después del envío exitoso
       _limpiarArchivosTemporales();
 
       if (mounted) {
@@ -456,6 +475,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         horarioProvider.refrescarTodo();
       }
     } catch (e) {
+      // Limpiar archivos en caso de error también
       _limpiarArchivosTemporales();
 
       if (mounted) {

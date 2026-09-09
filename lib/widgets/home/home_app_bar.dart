@@ -78,11 +78,23 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ],
       ),
-      child: const Center(
-        child: Icon(
-          Icons.fingerprint_rounded,
-          color: Colors.white,
-          size: 20,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.asset(
+          'assets/icon/icon.png',
+          width: 38,
+          height: 38,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            // Fallback si no encuentra la imagen
+            return const Center(
+              child: Icon(
+                Icons.fingerprint_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            );
+          },
         ),
       ),
     );

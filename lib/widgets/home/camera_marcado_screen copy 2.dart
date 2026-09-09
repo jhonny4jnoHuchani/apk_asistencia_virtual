@@ -263,7 +263,7 @@ class _CameraMarcadoScreenState extends State<CameraMarcadoScreen>
 
   Widget _buildCameraWithOverlay() {
     final screenSize = MediaQuery.of(context).size;
-    final frameSize = (screenSize.width * 0.8).clamp(220.0, 320.0);
+    final frameSize = (screenSize.width * 0.7).clamp(220.0, 320.0);
     final frameWidth = frameSize;
     final frameHeight = frameSize * 1.333;
 

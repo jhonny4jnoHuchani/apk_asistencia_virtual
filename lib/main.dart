@@ -250,11 +250,31 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ],
                     ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.school_rounded,
-                        size: 70,
-                        color: Colors.white,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.blue.shade400,
+                            Colors.blue.shade700,
+                            Colors.indigo.shade600,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(32),
+                      ),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(
+                              20), // Para que no se pegue a los bordes
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(32),
+                            child: Image.asset(
+                              'assets/icon/icon.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

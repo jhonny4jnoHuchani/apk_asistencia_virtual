@@ -391,7 +391,7 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildLogo(double size, double iconSize) {
     return Center(
       child: Hero(
-        tag: 'logo',
+        tag: 'assets/icon/icon.png',
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -442,11 +442,11 @@ class _LoginScreenState extends State<LoginScreen>
                   shape: BoxShape.circle,
                   color: Colors.white,
                 ),
-                child: Center(
-                  child: Icon(
-                    Icons.auto_awesome_rounded,
-                    size: iconSize,
-                    color: primary,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(32),
+                  child: Image.asset(
+                    'assets/icon/icon.png',
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
