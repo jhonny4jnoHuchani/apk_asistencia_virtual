@@ -72,5 +72,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<!-- Associated Domains para Universal Links (requiere dominio real) -->
+<!-- <key>com.apple.developer.associated-domains</key>
+<array>
+    <string>applinks:tudominio.com</string>
+</array> -->
 </dict>
 </plist>

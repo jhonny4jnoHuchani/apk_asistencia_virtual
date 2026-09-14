@@ -14,7 +14,7 @@ class GuiaDemoScreen extends StatefulWidget {
 class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
   final FlutterTts _flutterTts = FlutterTts();
 
-  // Keys para las flechas
+  // Keys para los targets del tutorial
   final GlobalKey _keyCardHorario = GlobalKey();
   final GlobalKey _keyBtnEntrada = GlobalKey();
   final GlobalKey _keyCamara = GlobalKey();
@@ -25,6 +25,12 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
 
   bool _mostrarExito = false;
   bool _mostrarCamara = false;
+
+  static const Color _primaryColor = Color(0xFF4A6CF7);
+  static const Color _warningColor = Color(0xFFF59E0B);
+  static const Color _successColor = Color(0xFF10B981);
+  static const Color _dangerColor = Color(0xFFEF4444);
+  static const Color _darkColor = Color(0xFF1A2B4A);
 
   @override
   void initState() {
@@ -51,6 +57,7 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
     await _flutterTts.awaitSpeakCompletion(true);
     await _flutterTts.speak(texto);
   }
+
   Future<void> _iniciarTutorial() async {
     // Esperar un poco para que la UI se dibuje
     await Future.delayed(const Duration(milliseconds: 500));
@@ -63,8 +70,8 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
           TargetContent(
             align: ContentAlign.bottom,
             child: _buildTargetContent(
-              'Este es un EJEMPLO de tu horario',
-              'Así verás tus clases del día. Cada clase tiene su materia, paralelo y horario.',
+              'Ejemplo de horario',
+              'Así verás tus clases del día. Cada tarjeta muestra la materia, el paralelo y el horario correspondiente.',
             ),
           ),
         ],
@@ -76,8 +83,8 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
           TargetContent(
             align: ContentAlign.bottom,
             child: _buildTargetContent(
-              'Botón VERDE: Marcar Entrada',
-              'Cuando llegues a tu clase, toca este botón con tu dedo.',
+              'Botón verde: Marcar Entrada',
+              'Cuando llegues a tu clase, presiona este botón para registrar tu ingreso.',
             ),
           ),
         ],
@@ -89,8 +96,8 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
           TargetContent(
             align: ContentAlign.bottom,
             child: _buildTargetContent(
-              'Cámara para tu rostro',
-              'La cámara se abrirá. Coloca tu cara dentro del óvalo blanco.',
+              'Cámara de verificación',
+              'La cámara se abrirá automáticamente. Ubica tu rostro dentro del óvalo blanco.',
             ),
           ),
         ],
@@ -103,7 +110,7 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
             align: ContentAlign.bottom,
             child: _buildTargetContent(
               'Botón de captura',
-              'Toca este botón blanco grande para tomarte la foto.',
+              'Presiona este botón blanco para tomar la fotografía.',
             ),
           ),
         ],
@@ -115,8 +122,8 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
           TargetContent(
             align: ContentAlign.bottom,
             child: _buildTargetContent(
-              'Importante - No hagas fraude',
-              'Esta foto verifica que seas tú. El sistema detectará si intentas hacer trampa y tu supervisor será notificado.',
+              'Importante: evitar fraude',
+              'Esta foto verifica tu identidad. El sistema detecta intentos de suplantación y notifica al supervisor correspondiente.',
             ),
           ),
         ],
@@ -128,8 +135,8 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
           TargetContent(
             align: ContentAlign.bottom,
             child: _buildTargetContent(
-              'Botón ROJO: Marcar Salida',
-              'Al terminar tu clase, toca este botón y repite los mismos pasos.',
+              'Botón rojo: Marcar Salida',
+              'Al finalizar tu clase, presiona este botón y repite los mismos pasos.',
             ),
           ),
         ],
@@ -152,22 +159,27 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
   Future<void> _hablarTarget(String identify) async {
     switch (identify) {
       case 'card_horario':
-        await _hablar('Este es un ejemplo de tu horario. Así verás tus clases del día.');
+        await _hablar(
+            'Este es un ejemplo de tu horario. Así verás tus clases del día.');
         break;
       case 'btn_entrada':
-        await _hablar('Este es el botón verde. Cuando llegues a tu clase, tócalo para marcar tu entrada.');
+        await _hablar(
+            'Este es el botón verde. Cuando llegues a tu clase, tócalo para marcar tu entrada.');
         break;
       case 'camara':
-        await _hablar('Aquí se abrirá la cámara. Coloca tu rostro dentro del óvalo blanco.');
+        await _hablar(
+            'Aquí se abrirá la cámara. Coloca tu rostro dentro del óvalo blanco.');
         break;
       case 'btn_capturar':
         await _hablar('Toca el botón blanco grande para tomarte la foto.');
         break;
       case 'mensaje_exito':
-        await _hablar('Importante. Esta foto verifica que seas tú. No intentes hacer fraude porque el sistema se dará cuenta y tu supervisor será notificado.');
+        await _hablar(
+            'Importante. Esta foto verifica que seas tú. No intentes hacer fraude porque el sistema se dará cuenta y tu supervisor será notificado.');
         break;
       case 'btn_salida':
-        await _hablar('Este es el botón rojo. Al terminar tu clase, tócalo para marcar tu salida.');
+        await _hablar(
+            'Este es el botón rojo. Al terminar tu clase, tócalo para marcar tu salida.');
         break;
     }
   }
@@ -178,13 +190,35 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(titulo, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            titulo,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: _darkColor,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text(descripcion, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
+          Text(
+            descripcion,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade700,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );
@@ -211,48 +245,38 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
-        title: const Text('MODO GUÍA - EJEMPLO'),
+        title: const Text(
+          'Modo Guía',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
         centerTitle: true,
-        backgroundColor: Colors.orange,
+        backgroundColor: _warningColor,
+        elevation: 0,
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // Banner de ejemplo
-            Container(
-              width: double.infinity,
-              color: Colors.orange.shade100,
-              padding: const EdgeInsets.all(8),
-              child: const Text(
-                '⚠️ ESTO ES UNA DEMOSTRACIÓN - NO ES TU HORARIO REAL',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
-              ),
-            ),
-
+            _buildBanner(),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // Card de horario demo
                   _buildHorarioDemo(),
                   const SizedBox(height: 20),
-
-                  // Cámara simulada
                   if (_mostrarCamara) ...[
                     _buildCamaraDemo(),
                     const SizedBox(height: 20),
                   ],
-
-                  // Mensaje de éxito
                   if (_mostrarExito) ...[
                     _buildMensajeExito(),
                     const SizedBox(height: 20),
                   ],
-
-                  // Botón final
                   if (_mostrarExito) _buildBotonFinal(),
                 ],
               ),
@@ -263,10 +287,47 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  //  Banner superior
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildBanner() {
+    return Container(
+      width: double.infinity,
+      color: _warningColor.withOpacity(0.12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded,
+              color: _warningColor, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Esta es una demostración. No corresponde a tu horario real.',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.orange.shade900,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Tarjeta de horario demo
+  // ─────────────────────────────────────────────────────────────
   Widget _buildHorarioDemo() {
     return Card(
       key: _keyCardHorario,
-      elevation: 4,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -276,43 +337,56 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
               children: [
                 const Expanded(
                   child: Text(
-                    'Matemáticas I (EJEMPLO)',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    'Matemáticas I',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _darkColor,
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade100,
+                    color: _primaryColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text('EJEMPLO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue)),
+                  child: const Text(
+                    'DEMO',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: _primaryColor,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            const Divider(),
+            Divider(color: Colors.grey.shade200, height: 1),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text('08:00 - 10:00', style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
-                const SizedBox(width: 16),
-                const Icon(Icons.group, size: 16, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text('Paralelo A', style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
-              ],
+
+            // Info de horario
+            _buildInfoRow(
+              icon: Icons.access_time_rounded,
+              textos: ['08:00 - 10:00'],
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text('Aula 101 (EJEMPLO)', style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
-              ],
+            _buildInfoRow(
+              icon: Icons.groups_rounded,
+              textos: ['Paralelo A'],
             ),
+            const SizedBox(height: 8),
+            _buildInfoRow(
+              icon: Icons.location_on_rounded,
+              textos: ['Aula 101'],
+            ),
+
             const SizedBox(height: 16),
+
+            // Botones
             Row(
               children: [
                 Expanded(
@@ -324,12 +398,16 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
                         _mostrarExito = false;
                       });
                     },
-                    icon: const Icon(Icons.login),
+                    icon: const Icon(Icons.login_rounded, size: 18),
                     label: const Text('Marcar Entrada'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: _successColor,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 0,
                     ),
                   ),
                 ),
@@ -343,12 +421,16 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
                         _mostrarExito = true;
                       });
                     },
-                    icon: const Icon(Icons.logout),
+                    icon: const Icon(Icons.logout_rounded, size: 18),
                     label: const Text('Marcar Salida'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
+                      backgroundColor: _dangerColor,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 0,
                     ),
                   ),
                 ),
@@ -360,33 +442,86 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
     );
   }
 
+  Widget _buildInfoRow({required IconData icon, required List<String> textos}) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: Colors.grey.shade500),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            textos.join('   ·   '),
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Cámara simulada
+  // ─────────────────────────────────────────────────────────────
   Widget _buildCamaraDemo() {
     return Container(
       key: _keyCamara,
-      height: 350,
+      height: 340,
       decoration: BoxDecoration(
         color: Colors.black,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange, width: 3),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _warningColor, width: 2),
       ),
       child: Stack(
         alignment: Alignment.center,
         children: [
+          // Óvalo guía
           Container(
-            width: 250,
-            height: 300,
+            width: 220,
+            height: 280,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(125),
               border: Border.all(color: Colors.white, width: 2),
             ),
           ),
-          const Positioned(
-            top: 10,
-            child: Text(
-              'CÁMARA DE PRUEBA',
-              style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+
+          // Etiqueta superior
+          Positioned(
+            top: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _warningColor,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'CÁMARA DE PRUEBA',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                ),
+              ),
             ),
           ),
+
+          // Texto dentro del óvalo
+          Positioned(
+            top: 150,
+            child: Text(
+              'Coloca tu rostro\ndentro del óvalo',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.85),
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ),
+
+          // Botón capturar
           Positioned(
             bottom: 20,
             child: GestureDetector(
@@ -398,14 +533,18 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
                 });
               },
               child: Container(
-                width: 70,
-                height: 70,
+                width: 68,
+                height: 68,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 4),
                   color: Colors.white,
                 ),
-                child: const Icon(Icons.camera, color: Colors.black, size: 30),
+                child: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: Colors.black,
+                  size: 28,
+                ),
               ),
             ),
           ),
@@ -414,23 +553,54 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  //  Mensaje de éxito
+  // ─────────────────────────────────────────────────────────────
   Widget _buildMensajeExito() {
     return Container(
       key: _keyMensajeExito,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
+        color: _successColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green),
+        border: Border.all(color: _successColor.withOpacity(0.35)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.check_circle, color: Colors.green, size: 30),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '✅ Entrada registrada correctamente',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _successColor.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_circle_rounded,
+              color: _successColor,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Entrada registrada correctamente',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: _darkColor,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'En el uso real, aquí verás el comprobante.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -438,22 +608,32 @@ class _GuiaDemoScreenState extends State<GuiaDemoScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  //  Botón final
+  // ─────────────────────────────────────────────────────────────
   Widget _buildBotonFinal() {
     return Container(
       key: _keyBtnFinal,
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: ElevatedButton(
         onPressed: _irAHomeReal,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
+          backgroundColor: _primaryColor,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 0,
         ),
         child: const Text(
           'Entendido, ir a mi horario real',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.2,
+          ),
         ),
       ),
     );

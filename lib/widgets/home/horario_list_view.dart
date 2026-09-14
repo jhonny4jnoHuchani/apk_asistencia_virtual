@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../../models/horario.dart';
 import 'horario_card_extended.dart';
 
 class HorarioListView extends StatelessWidget {
   final List<Horario> horarios;
-  final Future<void> Function() onRefresh;
+  final VoidCallback onRefresh;
   final Function(int) onMarcarEntrada;
   final Function(int) onMarcarSalida;
 
@@ -19,11 +20,9 @@ class HorarioListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: onRefresh,
-      color: const Color(0xFF5B67CA),
-      backgroundColor: Colors.white,
+      onRefresh: () async => onRefresh(),
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         itemCount: horarios.length,
         itemBuilder: (context, index) {
           final horario = horarios[index];

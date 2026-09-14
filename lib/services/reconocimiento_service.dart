@@ -1,7 +1,7 @@
 // lib/services/reconocimiento_service.dart
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart'; // <-- AGREGAR ESTA IMPORTACION
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import 'api_service.dart';

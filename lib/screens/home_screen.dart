@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:ui'; // para blur
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:camera/camera.dart';
@@ -55,13 +56,11 @@ void _processImageIsolate(List<dynamic> args) {
       return;
     }
 
-    // Redimensionar manteniendo proporción original
     final int maxWidth = 800;
-    final int maxHeight = 1066; // Mantiene proporción 3:4 aprox
+    final int maxHeight = 1066;
 
     img.Image resizedImage = image;
 
-    // Redimensionar manteniendo aspect ratio
     if (image.width > maxWidth || image.height > maxHeight) {
       final double widthRatio = maxWidth / image.width;
       final double heightRatio = maxHeight / image.height;
@@ -77,14 +76,12 @@ void _processImageIsolate(List<dynamic> args) {
       );
     }
 
-    // Guardar imagen procesada
     final tempDir = Directory.systemTemp;
     final processedPath =
         '${tempDir.path}/processed_${DateTime.now().millisecondsSinceEpoch}.jpg';
     final processedFile = File(processedPath);
     processedFile.writeAsBytesSync(img.encodeJpg(resizedImage, quality: 85));
 
-    // Eliminar el archivo original
     try {
       file.deleteSync();
     } catch (_) {}
@@ -348,7 +345,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final XFile photo = await _cameraController!.takePicture();
 
       if (_etapaFoto == 'frontal') {
-        // Procesar imagen sin recortar
         final processedFile = await _processImageInIsolate(File(photo.path));
         _fotoFrontal = processedFile;
         final instruccionGesto = _instruccionGesto(_gestoSolicitado!);
@@ -364,10 +360,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
 
-      // CONSTANCIA - procesar sin recorte
       _fotoConstancia = await _processImageInIsolate(File(photo.path));
 
-      // Liberar cámara antes de enviar
       await _cameraController?.dispose();
       setState(() {
         _mostrarCamara = false;
@@ -431,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               fotoConstancia: _fotoConstancia,
             );
 
-      await marcadoFuture.timeout(
+      final resultado = await marcadoFuture.timeout(
         const Duration(seconds: 25),
         onTimeout: () => throw Exception('Tiempo de espera agotado'),
       );
@@ -441,12 +435,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (mounted) {
         Navigator.of(context).pop();
 
-        CustomSnackbar.showSuccess(
-          context,
-          _tipoMarcado == 'entrada'
-              ? 'Entrada marcada correctamente'
-              : 'Salida marcada correctamente',
-        );
+        // Si el gesto no coincidio, avisar con advertencia.
+        // El marcado se guardo igual, asi que no es un error.
+        if (resultado.gestoNoCoincide) {
+          CustomSnackbar.showWarning(
+            context,
+            resultado.message,
+          );
+        } else {
+          CustomSnackbar.showSuccess(
+            context,
+            _tipoMarcado == 'entrada'
+                ? 'Entrada marcada correctamente'
+                : 'Salida marcada correctamente',
+          );
+        }
 
         setState(() {
           _isProcessing = false;
@@ -464,9 +467,255 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _isProcessing = false;
           _isSending = false;
         });
-        _mostrarDialogoError(e.toString().replaceAll('Exception: ', ''));
+
+        final mensaje = e.toString().replaceAll('Exception: ', '');
+
+        // Detectar errores especificos del reconocimiento facial
+        if (mensaje.toLowerCase().contains('quitate las gafas') ||
+            mensaje.toLowerCase().contains('lentes')) {
+          _mostrarDialogoLentes();
+        } else if (mensaje.toLowerCase().contains('gesto no coincide') ||
+            mensaje.toLowerCase().contains('gesto incorrecto')) {
+          _mostrarDialogoGestoIncorrecto();
+        } else if (mensaje.toLowerCase().contains('suplantacion') ||
+            mensaje.toLowerCase().contains('spoofing')) {
+          _mostrarDialogoSpoofing();
+        } else {
+          _mostrarDialogoError(mensaje);
+        }
       }
     }
+  }
+
+//  reintar marcado
+  Future<void> _reintentarMarcado() async {
+    if (_horarioIdSeleccionado == null || _tipoMarcado == null) {
+      // Si no hay contexto previo, cancelamos
+      _cancelarMarcado();
+      return;
+    }
+
+    final tipo = _tipoMarcado!;
+    final horarioId = _horarioIdSeleccionado!;
+
+    // Limpiar todo el estado anterior
+    _limpiarArchivosTemporales();
+    await _cameraController?.dispose();
+
+    setState(() {
+      _cameraController = null;
+      _mostrarCamara = false;
+      _isCameraReady = false;
+      _etapaFoto = null;
+      _fotoFrontal = null;
+      _fotoGesto = null;
+      _fotoConstancia = null;
+      _gestoSolicitado = null;
+      _isProcessing = false;
+      _isSending = false;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    // Volver a iniciar el marcado completo (biometría, permisos, GPS, cámara)
+    await _iniciarMarcado(tipo, horarioId);
+  }
+  // ============================================
+  // DIÁLOGOS DE ERROR
+  // ============================================
+
+  void _mostrarDialogoLentes() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.visibility_off_rounded, color: _warningColor, size: 28),
+            const SizedBox(width: 12),
+            const Text('Gafas detectadas',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Quitate las gafas para continuar con la verificacion.'),
+            SizedBox(height: 12),
+            Text(
+              'Las gafas pueden interferir con el reconocimiento facial.',
+              style: TextStyle(fontSize: 12, color: Colors.orange),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _cancelarMarcado();
+            },
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _reintentarMarcado();
+            },
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Reintentar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarDialogoGestoIncorrecto() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.pan_tool_rounded, color: _warningColor, size: 28),
+            const SizedBox(width: 12),
+            const Text('Gesto incorrecto',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'El gesto "${_gestoSolicitado}" no coincide con lo solicitado.',
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _warningColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _warningColor.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      color: _warningColor, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Realiza el gesto: ${_instruccionGesto(_gestoSolicitado!)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _warningColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _cancelarMarcado();
+            },
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _reintentarMarcado();
+            },
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Reintentar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarDialogoSpoofing() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: _dangerColor, size: 28),
+            const SizedBox(width: 12),
+            const Text('Suplantacion detectada',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'El sistema ha detectado un posible intento de suplantacion.',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Asegurate de estar frente a la camara y no usar fotos.',
+              style: TextStyle(fontSize: 13, color: Colors.orange),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _cancelarMarcado();
+            },
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _reintentarMarcado();
+            },
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Reintentar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _mostrarDialogoError(String mensaje) {
@@ -524,7 +773,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(context);
-              _enviarMarcado();
+              _reintentarMarcado();
             },
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('Reintentar'),
@@ -661,12 +910,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_mostrarCamara && _cameraController != null && _isCameraReady) {
       return CameraMarcadoScreen(
         cameraController: _cameraController!,
-        cameras: _cameras,
+        // cameras: _cameras,
         etapaFoto: _etapaFoto ?? 'frontal',
         gestoSolicitado: _gestoSolicitado,
         instruccionGesto: _instruccionGesto,
         onCapture: _capturarYMarcar,
         onCancel: _cancelarCamara,
+        // onCameraChanged: (newController) {
+        //   _cameraController = newController;
+        // },
       );
     }
 
@@ -733,141 +985,196 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final userPhotoUrl = user?.fotoPerfilUrl;
     final hasPhoto = userPhotoUrl != null && userPhotoUrl.isNotEmpty;
     final firstName = userName.split(' ').first;
+    final saludo = _getSaludo(); // NUEVO
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                onTap: () {},
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.grey.shade100,
-                    border: Border.all(color: Colors.grey.shade200, width: 1),
-                  ),
-                  child: ClipOval(
-                    child: hasPhoto
-                        ? Image.network(
-                            userPhotoUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _buildAvatarPlaceholder(firstName),
-                          )
-                        : _buildAvatarPlaceholder(firstName),
-                  ),
+      padding: const EdgeInsets.fromLTRB(10, 1, 10, 5),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), // ESMERILADO
+          child: Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: const Color.fromARGB(235, 255, 253, 253)
+                  .withOpacity(0.7), // Fondo translucido
+              borderRadius: BorderRadius.circular(20),
+              border:
+                  Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'Buenos dias,',
-                      style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w400),
+                    // AVATAR CON ANILLO DEGRADADO
+                    GestureDetector(
+                      onTap: () {},
+                      child: Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF007AFF), Color(0xFFAF52DE)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF007AFF).withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(2), // grosor del anillo
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                          ),
+                          child: ClipOval(
+                            child: hasPhoto
+                                ? Image.network(
+                                    userPhotoUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _buildAvatarPlaceholder(firstName),
+                                  )
+                                : _buildAvatarPlaceholder(firstName),
+                          ),
+                        ),
+                      ),
                     ),
-                    Text(
-                      firstName,
-                      style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                          letterSpacing: -0.5),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            saludo, // "Buenos dias" / "Buenas tardes"
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500),
+                          ),
+                          Text(
+                            firstName,
+                            style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black,
+                                letterSpacing: -0.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // CHIP "HOY" CON BLUR
+                    _pillChip(
+                      icon: Icons.calendar_today_rounded,
+                      text: 'Hoy',
+                      color: const Color(0xFF007AFF),
                     ),
                   ],
                 ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                const SizedBox(height: 14),
+                // CHIPS DE ROL Y FECHA
+                Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded,
-                        size: 14, color: Colors.grey[700]),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Hoy',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[800]),
+                    _pillChip(
+                      icon: Icons.badge_outlined,
+                      text: userRole,
+                      color: const Color(0xFF34C759),
                     ),
+                    const SizedBox(width: 8),
+                    if (_currentDate != null)
+                      Expanded(
+                        child: _pillChip(
+                          icon: Icons.event_note_rounded,
+                          text: _currentDate!,
+                          color: const Color(0xFFFF9500),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildIosChip(icon: Icons.badge_outlined, text: userRole),
-              const SizedBox(width: 8),
-              if (_currentDate != null)
-                Expanded(
-                  child: _buildIosChip(
-                      icon: Icons.event_note_rounded, text: _currentDate!),
-                ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildIosChip({required IconData icon, required String text}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Colors.grey[700]),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              text,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey[800]),
-              overflow: TextOverflow.ellipsis,
-            ),
+// NUEVO: CHIP CON BLUR Y COLOR
+  Widget _pillChip(
+      {required IconData icon, required String text, required Color color}) {
+    return ClipRRect(
+      // borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.2), width: 0.5),
           ),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600, color: color),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildAvatarPlaceholder(String name) {
     return Container(
-      color: const Color(0xFF6C63FF).withOpacity(0.15),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF6C63FF).withOpacity(0.2),
+            const Color(0xFF007AFF).withOpacity(0.2),
+          ],
+        ),
+      ),
       child: Center(
         child: Text(
           name.isNotEmpty ? name[0].toUpperCase() : 'U',
           style: const TextStyle(
               color: Color(0xFF6C63FF),
-              fontSize: 18,
-              fontWeight: FontWeight.w700),
+              fontSize: 20,
+              fontWeight: FontWeight.w800),
         ),
       ),
     );
+  }
+
+// NUEVO: SALUDO DINAMICO
+  String _getSaludo() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Buenos días';
+    if (hour < 19) return 'Buenas tardes';
+    return 'Buenas noches';
   }
 }

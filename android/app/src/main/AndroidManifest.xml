@@ -46,12 +46,38 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme"/>
             
-            <!-- INTENT-FILTER PARA DEEP LINKING -->
-            <intent-filter>
+            <!-- ============================================ -->
+            <!-- DEEP LINKS: reset-password                   -->
+            <!-- ============================================ -->
+            
+            <!-- 1) asistencia://reset-password?token=X&email=Y -->
+            <!--    Formato con host = reset-password          -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="asistencia" android:host="reset-password" />
+            </intent-filter>
+            
+            <!-- 2) asistencia://app/reset-password?token=X&email=Y -->
+            <!--    Formato con path = /reset-password           -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="asistencia" />
+                <data android:host="app" />
+                <data android:pathPrefix="/reset-password" />
+            </intent-filter>
+            
+            <!-- 3) https://tudominio.com/reset-password?token=X&email=Y -->
+            <!--    (App Links — requiere assetlinks.json en el servidor) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="tudominio.com" />
+                <data android:pathPrefix="/reset-password" />
             </intent-filter>
             
             <!-- INTENT-FILTER PARA LAUNCHER (separado) -->

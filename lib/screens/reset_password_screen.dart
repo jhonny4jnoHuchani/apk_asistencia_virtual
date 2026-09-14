@@ -29,7 +29,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _isLoading = false;
   bool _passwordReset = false;
   String? _error;
-  double _passwordStrength = 0.0; // NUEVO
+  double _passwordStrength = 0.0;
 
   static const Color _primaryColor = Color(0xFF6C63FF);
   static const Color _secondaryColor = Color(0xFF3B82F6);
@@ -40,11 +40,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   void initState() {
     super.initState();
-    _passwordController.addListener(_updatePasswordStrength); // NUEVO
+    _passwordController.addListener(_updatePasswordStrength);
+
+    // DEBUG TEMPORAL — comenta cuando ya no lo necesites
+    // debugPrint(' ResetPasswordScreen → token(${widget.token.length}): '
+    //     '${widget.token.isEmpty ? "(vacío)" : widget.token}');
+    // debugPrint(' email: ${widget.email}');
+    // debugPrint(' fromRegistration: ${widget.fromRegistration}');
   }
 
   void _updatePasswordStrength() {
-    // NUEVO
     final password = _passwordController.text;
     double strength = 0;
     if (password.length >= 6) strength += 0.25;
@@ -71,10 +76,30 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     try {
       final authProvider = context.read<AuthProvider>();
-      final success = await authProvider.setPassword(
-        newPassword: _passwordController.text,
-        confirmPassword: _confirmPasswordController.text,
-      );
+      bool success;
+
+      if (widget.fromRegistration) {
+        // Caso 1: Viene del registro facial (SÍ está logueado)
+        success = await authProvider.setPassword(
+          newPassword: _passwordController.text,
+          confirmPassword: _confirmPasswordController.text,
+        );
+      } else {
+        // Caso 2: Viene del LINK del correo (NO está logueado)
+        if (widget.token.isEmpty) {
+          setState(() {
+            _error = 'Link inválido o expirado. Solicita uno nuevo.';
+            _isLoading = false;
+          });
+          return;
+        }
+        success = await authProvider.resetPassword(
+          email: widget.email,
+          token: widget.token,
+          newPassword: _passwordController.text,
+          confirmPassword: _confirmPasswordController.text,
+        );
+      }
 
       if (!mounted) return;
 
@@ -90,6 +115,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');
         _isLoading = false;
@@ -144,11 +170,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   BoxDecoration _buildBackgroundDecoration() {
-    return BoxDecoration(
+    return const BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [const Color(0xFFEEF2FF), Colors.white],
+        colors: [Color(0xFFEEF2FF), Colors.white],
       ),
     );
   }
@@ -157,7 +183,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     return Column(
       children: [
         TweenAnimationBuilder(
-          // NUEVO: Animación de entrada
           tween: Tween<double>(begin: 0, end: 1),
           duration: const Duration(milliseconds: 600),
           builder: (_, double val, child) =>
@@ -223,9 +248,98 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ],
           ),
         ),
+
+        // ─────────────────────────────────────────────────────────
+        // DEBUG: muestra si llegó el token y su valor.
+        // Comenta estas 2 líneas cuando ya no lo necesites.
+        // ─────────────────────────────────────────────────────────
+        const SizedBox(height: 10),
+        // _buildTokenDebug(),
+        // ─────────────────────────────────────────────────────────
       ],
     );
   }
+
+  // DEBUG TEMPORAL — borra este método cuando termines de depurar.
+  // Widget _buildTokenDebug() {
+  //   final tieneToken = widget.token.isNotEmpty;
+  //   final tokenCorto = tieneToken
+  //       ? (widget.token.length > 20
+  //           ? '${widget.token.substring(0, 20)}…'
+  //           : widget.token)
+  //       : '(vacío)';
+
+  //   return Container(
+  //     margin: const EdgeInsets.symmetric(horizontal: 8),
+  //     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  //     decoration: BoxDecoration(
+  //       color: tieneToken
+  //           ? Colors.green.withOpacity(0.08)
+  //           : Colors.orange.withOpacity(0.10),
+  //       borderRadius: BorderRadius.circular(10),
+  //       border: Border.all(
+  //         color: tieneToken
+  //             ? Colors.green.withOpacity(0.35)
+  //             : Colors.orange.withOpacity(0.45),
+  //       ),
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Row(
+  //           mainAxisSize: MainAxisSize.min,
+  //           children: [
+  //             Icon(
+  //               tieneToken
+  //                   ? Icons.check_circle_rounded
+  //                   : Icons.warning_amber_rounded,
+  //               size: 14,
+  //               color:
+  //                   tieneToken ? Colors.green.shade700 : Colors.orange.shade800,
+  //             ),
+  //             const SizedBox(width: 6),
+  //             Text(
+  //               tieneToken ? 'Token recibido' : 'Sin token',
+  //               style: TextStyle(
+  //                 fontSize: 11.5,
+  //                 fontWeight: FontWeight.w700,
+  //                 color: tieneToken
+  //                     ? Colors.green.shade800
+  //                     : Colors.orange.shade900,
+  //               ),
+  //             ),
+  //             const SizedBox(width: 8),
+  //             Text(
+  //               '(${widget.token.length} chars)',
+  //               style: TextStyle(
+  //                 fontSize: 10.5,
+  //                 color: Colors.grey.shade600,
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //         const SizedBox(height: 4),
+  //         SelectableText(
+  //           tokenCorto,
+  //           style: TextStyle(
+  //             fontSize: 10.5,
+  //             fontFamily: 'monospace',
+  //             color: Colors.grey.shade800,
+  //           ),
+  //         ),
+  //         const SizedBox(height: 4),
+  //         Text(
+  //           'fromRegistration: ${widget.fromRegistration}',
+  //           style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600),
+  //         ),
+  //         Text(
+  //           'email: ${widget.email.isEmpty ? "(vacío)" : widget.email}',
+  //           style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildFormCard() {
     return Card(
@@ -249,7 +363,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 const SizedBox(height: 12),
                 _buildPasswordField(),
                 const SizedBox(height: 6),
-                _buildPasswordStrengthBar(), // NUEVO
+                _buildPasswordStrengthBar(),
                 const SizedBox(height: 12),
                 _buildConfirmPasswordField(),
                 const SizedBox(height: 18),
@@ -265,7 +379,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   Widget _buildPasswordStrengthBar() {
-    // NUEVO
     Color color = _passwordStrength < 0.5
         ? _errorColor
         : _passwordStrength < 0.75
@@ -320,7 +433,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             _buildRequirementItem('6+ caracteres'),
             _buildRequirementItem('1 Mayúscula'),
             _buildRequirementItem('1 Número'),
-            _buildRequirementItem('1 Símbolo'), // AGREGADO
+            _buildRequirementItem('1 Símbolo'),
           ]),
         ],
       ),
@@ -388,7 +501,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   InputDecoration _inputDecoration(String label, String hint, IconData icon,
       bool obscure, VoidCallback onToggle) {
-    // HELPER
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade600),
@@ -411,11 +523,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Widget _buildSubmitButton() {
     return Container(
-      // NUEVO: Gradiente
       height: 48,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        gradient: LinearGradient(colors: [_primaryColor, _secondaryColor]),
+        gradient:
+            const LinearGradient(colors: [_primaryColor, _secondaryColor]),
         boxShadow: [
           BoxShadow(
               color: _primaryColor.withOpacity(0.3),
@@ -448,7 +560,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     return TextButton(
       onPressed: () => Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (_) => const LoginScreen())),
-      child: Text('Volver al inicio de sesión',
+      child: const Text('Volver al inicio de sesión',
           style: TextStyle(
               color: _primaryColor, fontWeight: FontWeight.w600, fontSize: 13)),
     );
@@ -474,7 +586,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Widget _buildSuccessWidget() {
     return TweenAnimationBuilder(
-      // NUEVO: Animación
       tween: Tween<double>(begin: 0, end: 1),
       duration: const Duration(milliseconds: 500),
       builder: (_, double val, child) => Opacity(

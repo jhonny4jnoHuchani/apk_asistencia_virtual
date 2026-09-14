@@ -929,7 +929,7 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                'v3.0.0',
+                'v1.0.0',
                 style: TextStyle(
                   color: secondary.withOpacity(0.6),
                   fontSize: isSmall ? 9.0 : 11.0,
@@ -977,7 +977,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 6),
         Text(
-          '2026 Asistencia Virtual Pro',
+          '2026 Mi Control UPEA',
           style: TextStyle(
             color: textSecondary.withOpacity(0.15),
             fontSize: isSmall ? 9.0 : 11.0,

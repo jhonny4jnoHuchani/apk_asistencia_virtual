@@ -1284,13 +1284,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
               icon: Icons.privacy_tip_rounded,
               label: 'Política de privacidad',
               color: _textSecondary,
-              onTap: () {
-                _mostrarDialogo(
-                  context,
-                  'Política de privacidad',
-                  'Tu información personal está protegida conforme a las leyes de protección de datos. Los datos biométricos se almacenan de forma segura y solo se utilizan para verificar tu identidad en el sistema de asistencia.',
-                );
-              },
+              onTap: () => _mostrarPoliticaPrivacidad(context),
             ),
             const Divider(height: 24),
             _buildActionOption(
@@ -1305,8 +1299,377 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 );
               },
             ),
+            const Divider(height: 24),
+            _buildActionOption(
+              icon: Icons.info_outline_rounded,
+              label: 'Acerca de la aplicación',
+              color: _textSecondary,
+              onTap: () => _mostrarAcercaDe(context),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _mostrarAcercaDe(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+        content: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Ícono
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _primaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.school_rounded,
+                  size: 40,
+                  color: _primaryColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Nombre
+              const Text(
+                'Mi Control UPEA',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+
+              // Versión
+              const Text(
+                'Versión 1.0.0 (build 1)',
+                style: TextStyle(fontSize: 13, color: _textSecondary),
+              ),
+              const SizedBox(height: 16),
+
+              // Descripción
+              const Text(
+                'Sistema de control de asistencia docente con reconocimiento '
+                'facial desarrollado para la Universidad Pública de El Alto.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _textSecondary,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+
+              // Créditos
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _backgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.code_rounded,
+                            size: 16, color: _primaryColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Desarrollado por Ronaldo TC',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.business_rounded,
+                            size: 16, color: _textSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'UTIC — Universidad Pública de El Alto',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: _textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Copyright
+              const Text(
+                '© 2026 Universidad Pública de El Alto',
+                style: TextStyle(fontSize: 11, color: _textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const Text(
+                'Todos los derechos reservados.',
+                style: TextStyle(fontSize: 11, color: _textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: _primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            ),
+            child: const Text(
+              'Cerrar',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarPoliticaPrivacidad(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
+          ),
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header con ícono
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.privacy_tip_rounded,
+                        color: _primaryColor,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Política de privacidad',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Introducción
+                const Text(
+                  'En Mi Control UPEA protegemos tu información personal y tus '
+                  'datos biométricos.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Sección 1
+                _buildPoliticaSection(
+                  numero: '1',
+                  titulo: 'Datos que recopilamos',
+                  contenido:
+                      'Recopilamos tu nombre, correo institucional, carnet de '
+                      'identidad y una muestra biométrica facial para verificar '
+                      'tu identidad al registrar asistencia.',
+                ),
+
+                // Sección 2
+                _buildPoliticaSection(
+                  numero: '2',
+                  titulo: 'Uso de los datos',
+                  contenido: 'Tus datos se utilizan únicamente para:\n'
+                      '• Verificar tu identidad en el sistema de asistencia docente.\n'
+                      '• Registrar tu entrada y salida de manera segura.\n'
+                      '• Generar reportes internos de asistencia.',
+                ),
+
+                // Sección 3
+                _buildPoliticaSection(
+                  numero: '3',
+                  titulo: 'Protección de datos biométricos',
+                  contenido:
+                      'Tu muestra facial se almacena cifrada y no puede ser '
+                      'reconstruida para identificarte fuera de la aplicación. '
+                      'No compartimos esta información con terceros.',
+                ),
+
+                // Sección 4
+                _buildPoliticaSection(
+                  numero: '4',
+                  titulo: 'Tus derechos',
+                  contenido:
+                      'Puedes solicitar acceso, corrección o eliminación de tus '
+                      'datos personales contactando a la Unidad de Tecnologías de '
+                      'Información y Comunicación de la UPEA - UTIC.',
+                ),
+
+                // Sección 5
+                _buildPoliticaSection(
+                  numero: '5',
+                  titulo: 'Legislación aplicable',
+                  contenido:
+                      'Este tratamiento se realiza conforme a la Ley N° 164 de '
+                      'Protección de Datos Personales del Estado Plurinacional '
+                      'de Bolivia.',
+                ),
+
+                const SizedBox(height: 12),
+
+                // Aceptación
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _primaryColor.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        size: 18,
+                        color: _primaryColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Al usar la aplicación aceptas el tratamiento de tus '
+                          'datos según esta política.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _primaryColor,
+                            fontWeight: FontWeight.w500,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: _primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            ),
+            child: const Text(
+              'Entendido',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Widget helper para cada sección
+  Widget _buildPoliticaSection({
+    required String numero,
+    required String titulo,
+    required String contenido,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  numero,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  titulo,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(left: 34),
+            child: Text(
+              contenido,
+              style: const TextStyle(
+                fontSize: 13,
+                color: _textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

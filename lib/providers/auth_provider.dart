@@ -5,6 +5,7 @@ import 'dart:io';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/reconocimiento_service.dart';
+import '../deep_link_state.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -146,6 +147,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Restablecer contraseña con token
+  // Restablecer contraseña con token - NO REQUIERE SESION
   Future<bool> resetPassword({
     required String email,
     required String token,
@@ -164,13 +166,14 @@ class AuthProvider extends ChangeNotifier {
         passwordConfirmation: confirmPassword,
       );
 
-      _isLoading = false;
-      notifyListeners();
-
       if (response['success'] == true) {
+        _isLoading = false;
+        notifyListeners();
         return true;
       } else {
         _error = response['message'] ?? 'Error al restablecer la contraseña';
+        _isLoading = false;
+        notifyListeners();
         return false;
       }
     } catch (e) {
@@ -236,6 +239,8 @@ class AuthProvider extends ChangeNotifier {
     await _authService.logout();
     _user = null;
     _error = null;
+    DeepLinkState.deepLinkHandled = false; // 🔧 resetear
+    DeepLinkState.pendingUri = null; // 🔧 limpiar
     notifyListeners();
   }
 
