@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../providers/auth_provider.dart';
 import 'cambio_password_screen.dart';
 import 'home_screen.dart';
@@ -52,6 +53,7 @@ class _LoginScreenState extends State<LoginScreen>
   static const Color neonBlue = Color(0xFF3B82F6);
 
   final LocalAuthentication _localAuth = LocalAuthentication();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   static const String _biometricPrefKey = 'biometric_enabled';
   static const String _biometricEmailKey = 'biometric_email';
@@ -94,8 +96,10 @@ class _LoginScreenState extends State<LoginScreen>
 
       final prefs = await SharedPreferences.getInstance();
       final biometricEnabled = prefs.getBool(_biometricPrefKey) ?? false;
-      final hasCredentials = prefs.getString(_biometricEmailKey) != null &&
-          prefs.getString(_biometricEmailKey)!.isNotEmpty;
+      final email = prefs.getString(_biometricEmailKey);
+      final hasPassword =
+          await _secureStorage.containsKey(key: _biometricPasswordKey);
+      final hasCredentials = email != null && email.isNotEmpty && hasPassword;
 
       if (mounted) {
         setState(() {
@@ -118,9 +122,17 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _cargarCredenciales() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final email = prefs.getString('remember_email');
-      final password = prefs.getString('remember_password');
       final remember = prefs.getBool('remember_me') ?? false;
+      final email = prefs.getString('remember_email');
+      final password = await _secureStorage.read(key: 'remember_password');
+
+      // Limpieza preventiva: si existían contraseñas viejas sin cifrar en SharedPreferences, borrarlas
+      if (prefs.containsKey('remember_password')) {
+        await prefs.remove('remember_password');
+      }
+      if (prefs.containsKey(_biometricPasswordKey)) {
+        await prefs.remove(_biometricPasswordKey);
+      }
 
       if (remember && email != null && password != null) {
         setState(() {
@@ -139,11 +151,12 @@ class _LoginScreenState extends State<LoginScreen>
       final prefs = await SharedPreferences.getInstance();
       if (_rememberMe) {
         await prefs.setString('remember_email', _emailController.text.trim());
-        await prefs.setString('remember_password', _passwordController.text);
+        await _secureStorage.write(
+            key: 'remember_password', value: _passwordController.text);
         await prefs.setBool('remember_me', true);
       } else {
         await prefs.remove('remember_email');
-        await prefs.remove('remember_password');
+        await _secureStorage.delete(key: 'remember_password');
         await prefs.setBool('remember_me', false);
       }
     } catch (e) {
@@ -155,8 +168,9 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_biometricEmailKey, _emailController.text.trim());
-      await prefs.setString(_biometricPasswordKey, _passwordController.text);
       await prefs.setString(_biometricUserIdKey, userId);
+      await _secureStorage.write(
+          key: _biometricPasswordKey, value: _passwordController.text);
     } catch (e) {
       print('Error al guardar credenciales biométricas: $e');
     }
@@ -189,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen>
       if (authenticated) {
         final prefs = await SharedPreferences.getInstance();
         final email = prefs.getString(_biometricEmailKey);
-        final password = prefs.getString(_biometricPasswordKey);
+        final password = await _secureStorage.read(key: _biometricPasswordKey);
 
         if (email != null &&
             password != null &&

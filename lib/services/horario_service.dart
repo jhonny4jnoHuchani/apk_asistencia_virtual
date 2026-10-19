@@ -12,7 +12,18 @@ class HorarioService {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final List<dynamic> horariosJson = data['data'] ?? [];
-      return horariosJson.map((json) => Horario.fromJson(json)).toList();
+      return horariosJson
+          .map((json) {
+            try {
+              return Horario.fromJson(json);
+            } catch (e) {
+              print('[HorarioService] Error parseando horario individual: $e');
+              print('[HorarioService] JSON defectuoso: $json');
+              return null;
+            }
+          })
+          .whereType<Horario>()
+          .toList();
     } else {
       // Mostrar el error real
       throw Exception('Error ${response.statusCode}: ${response.body}');

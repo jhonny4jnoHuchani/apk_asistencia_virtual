@@ -250,7 +250,7 @@ class Marcado {
       final horaRealParts = hora.split(':');
       final horaProgParts = horaInicio!.split(':');
 
-      if (horaRealParts.length == 2 && horaProgParts.length == 2) {
+      if (horaRealParts.length >= 2 && horaProgParts.length >= 2) {
         final realMinutos =
             int.parse(horaRealParts[0]) * 60 + int.parse(horaRealParts[1]);
         final progMinutos =

@@ -1,30 +1,45 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:asistencia_docente/main.dart';
+import 'package:mi_control_upea/models/horario.dart';
+import 'package:mi_control_upea/models/marcado.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('Model Smoke Tests', () {
+    test('Marcado parses properly and calculates diferenciaMinutos correctly',
+        () {
+      final marcado = Marcado(
+        id: 1,
+        horarioId: 10,
+        fecha: DateTime(2026, 10, 19),
+        hora: '08:20:00',
+        tipo: 'entrada',
+        materia: 'Anatomía',
+        paralelo: 'A',
+        estado: 'PENDIENTE',
+        horaInicio: '08:00:00',
+        horaFin: '10:00:00',
+      );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      expect(marcado.materia, 'Anatomía');
+      expect(marcado.diferenciaMinutos, 20);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('Horario calculates yaMarcoEntrada and yaMarcoSalida correctly', () {
+      final horario = Horario(
+        id: 1,
+        diaSemana: 'Lunes',
+        horaInicio: '08:00',
+        horaFin: '10:00',
+        materia: 'Fisiología',
+        paralelo: 'B',
+        paraleloMateriaId: 10,
+        ubicacionId: 5,
+        yaMarcoEntrada: true,
+        yaMarcoSalida: false,
+      );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      expect(horario.yaMarcoEntrada, true);
+      expect(horario.yaMarcoSalida, false);
+      expect(horario.estaCompletado, false);
+    });
   });
 }

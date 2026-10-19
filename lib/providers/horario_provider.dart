@@ -3,10 +3,12 @@ import '../models/horario.dart';
 import '../models/marcado.dart';
 import '../services/horario_service.dart';
 import '../services/marcado_service.dart';
+import '../services/notification_service.dart';
 
 class HorarioProvider extends ChangeNotifier {
   final HorarioService _horarioService = HorarioService();
   final MarcadoService _marcadoService = MarcadoService();
+  final NotificationService _notificationService = NotificationService();
 
   List<Horario> _horarios = [];
   List<Marcado> _marcadosHoy = [];
@@ -29,6 +31,9 @@ class HorarioProvider extends ChangeNotifier {
       _horarios = await _horarioService.getHorariosHoy();
       _isLoading = false;
       notifyListeners();
+
+      // Programar notificaciones locales para los horarios del día
+      _notificationService.programarNotificacionesHorarios(_horarios);
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;

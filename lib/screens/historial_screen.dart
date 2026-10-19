@@ -89,7 +89,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
     final Map<String, GrupoMarcado> gruposMap = {};
     for (final m in marcados) {
       final key =
-          '${m.materia}_${m.paralelo}_${DateFormat('yyyy-MM-dd').format(m.fecha)}';
+          '${m.horarioId}_${m.materia}_${m.paralelo}_${DateFormat('yyyy-MM-dd').format(m.fecha)}';
       gruposMap.putIfAbsent(
           key,
           () => GrupoMarcado(
@@ -100,8 +100,9 @@ class _HistorialScreenState extends State<HistorialScreen> {
                 horaInicio: m.horaInicio ?? '--:--',
                 horaFin: m.horaFin ?? '--:--',
               ));
-      if (m.tipo == 'entrada') gruposMap[key]!.entrada = m;
-      if (m.tipo == 'salida') gruposMap[key]!.salida = m;
+      final tipo = m.tipo.trim().toLowerCase();
+      if (tipo == 'entrada') gruposMap[key]!.entrada = m;
+      if (tipo == 'salida') gruposMap[key]!.salida = m;
     }
     return gruposMap.values.toList()
       ..sort((a, b) => b.fecha.compareTo(a.fecha));

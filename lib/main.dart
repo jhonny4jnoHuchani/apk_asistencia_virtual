@@ -16,10 +16,12 @@ import 'screens/guia_demo_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'deep_link_state.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es', null);
+  await NotificationService().init();
   runApp(const MyApp());
 }
 

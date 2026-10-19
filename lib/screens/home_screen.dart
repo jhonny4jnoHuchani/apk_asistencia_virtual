@@ -14,6 +14,7 @@ import '../providers/auth_provider.dart';
 import '../providers/horario_provider.dart';
 import '../services/marcado_service.dart';
 import '../services/biometric_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/home/home_app_bar.dart';
 import '../widgets/home/horario_list_view.dart';
@@ -31,10 +32,11 @@ import 'registro_facial_screen.dart';
 // FUNCIÓN PARA ISOLATE - PROCESAMIENTO DE IMAGEN (SIN RECORTE)
 // ============================================
 Future<File> _processImageInIsolate(File originalFile) async {
+  final tempDir = await getTemporaryDirectory();
   final receivePort = ReceivePort();
 
-  await Isolate.spawn(
-      _processImageIsolate, [receivePort.sendPort, originalFile.path]);
+  await Isolate.spawn(_processImageIsolate,
+      [receivePort.sendPort, originalFile.path, tempDir.path]);
 
   final result = await receivePort.first as String;
   receivePort.close();
@@ -45,6 +47,8 @@ Future<File> _processImageInIsolate(File originalFile) async {
 void _processImageIsolate(List<dynamic> args) {
   final SendPort sendPort = args[0];
   final String filePath = args[1];
+  final String tempDirPath =
+      args.length > 2 ? args[2] : Directory.systemTemp.path;
 
   try {
     final File file = File(filePath);
@@ -76,9 +80,8 @@ void _processImageIsolate(List<dynamic> args) {
       );
     }
 
-    final tempDir = Directory.systemTemp;
     final processedPath =
-        '${tempDir.path}/processed_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        '$tempDirPath/processed_${DateTime.now().millisecondsSinceEpoch}.jpg';
     final processedFile = File(processedPath);
     processedFile.writeAsBytesSync(img.encodeJpg(resizedImage, quality: 85));
 
@@ -145,6 +148,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadCurrentDate();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HorarioProvider>().cargarHorarios();
+      NotificationService().requestPermissions();
     });
   }
 
@@ -218,12 +222,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final permisosOk = await _solicitarPermisos();
     if (!permisosOk) return;
 
+    final isLocationEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!isLocationEnabled) {
+      if (!mounted) return;
+      CustomSnackbar.showError(
+        context,
+        'El GPS está desactivado. Por favor, activa la ubicación en tu dispositivo.',
+      );
+      await Geolocator.openLocationSettings();
+      return;
+    }
+
     try {
       _posicionGPS = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
       );
     } catch (e) {
-      CustomSnackbar.showError(context, 'No se pudo obtener la ubicacion GPS');
+      if (!mounted) return;
+      CustomSnackbar.showError(
+        context,
+        'No se pudo obtener la ubicación GPS: $e',
+      );
       return;
     }
 
