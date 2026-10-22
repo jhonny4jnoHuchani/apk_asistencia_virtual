@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
+import 'dart:math';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/reconocimiento_service.dart';
@@ -250,21 +250,40 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Obtener ID unico del dispositivo
+  // Obtener ID unico de la instalacion.
+  // Se genera un UUID v4 la primera vez y se guarda en el almacenamiento
+  // seguro (Keystore/Keychain), asi se mantiene entre sesiones y logout,
+  // y cambia solo si la app se desinstala o se borran sus datos.
+  static const String _installationIdKey = 'installation_id';
+
   Future<String> _getDeviceId() async {
     try {
-      final deviceInfo = DeviceInfoPlugin();
-      if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        return androidInfo.id;
-      } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        return iosInfo.identifierForVendor ?? 'unknown';
-      }
+      final stored = await _storage.read(key: _installationIdKey);
+      if (stored != null && stored.isNotEmpty) return stored;
     } catch (e) {
-      // Si falla, generar un ID unico
+      // Datos ilegibles (ej. restaurados de un backup sin la clave del
+      // Keystore): se descartan y se genera un ID nuevo
+      await _storage.delete(key: _installationIdKey).catchError((_) {});
     }
-    return 'device_${DateTime.now().millisecondsSinceEpoch}';
+
+    final nuevoId = _generarUuidV4();
+    try {
+      await _storage.write(key: _installationIdKey, value: nuevoId);
+    } catch (e) {
+      // Si no se puede guardar, se usa igual para este login
+    }
+    return nuevoId;
+  }
+
+  String _generarUuidV4() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variante RFC 4122
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
+        '${hex.substring(20)}';
   }
 
 // NUEVO MÉTODO: Establecer contraseña después del registro facial
