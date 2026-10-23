@@ -659,16 +659,28 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     );
   }
 
-  // Igual que en la guia anterior: marca la guia como vista y va al Home
+  // Marca la guia como vista y sale:
+  // - Abierta desde el Home o Perfil (push): vuelve a esa pantalla.
+  // - Primer ingreso (pushReplacement, sin pantalla anterior): va al Home.
   Future<void> _finalizar() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('ya_vio_tutorial', true);
     if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-      (route) => false,
-    );
+    // [ANTERIOR] Siempre reiniciaba el Home:
+    // Navigator.pushAndRemoveUntil(
+    //   context,
+    //   MaterialPageRoute(builder: (_) => const HomeScreen()),
+    //   (route) => false,
+    // );
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -842,18 +854,202 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       case EtapaGuia.salida:
         return _buildEtapaSalida();
       case EtapaGuia.consejos:
-        return _buildTextoEtapa(
-          Icons.lightbulb_rounded,
-          'Consejos',
-          'Pendiente (Fase 6): errores comunes y cómo evitarlos.',
-        );
+        return _buildEtapaConsejos();
       case EtapaGuia.fin:
-        return _buildTextoEtapa(
-          Icons.check_circle_rounded,
-          '¡Listo!',
-          'Ya conoces todo el proceso de marcado.',
-        );
+        return _buildEtapaFin();
     }
+  }
+
+  // Etapa 8: errores comunes. Los titulos son los mismos mensajes que
+  // muestra el marcado real (home_screen.dart)
+  Widget _buildEtapaConsejos() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Estos son los avisos más comunes al marcar. Toca cada uno para '
+          'ver por qué aparece y qué hacer.',
+          style: TextStyle(fontSize: 14, color: _darkColor, height: 1.4),
+        ),
+        const SizedBox(height: 12),
+        _buildConsejo(
+          Icons.visibility_off_rounded,
+          _warningColor,
+          'Gafas detectadas',
+          'Los lentes pueden impedir que el sistema reconozca tu rostro.',
+          'Quítate los lentes antes de la foto frontal y toca "Reintentar".',
+        ),
+        _buildConsejo(
+          Icons.warning_amber_rounded,
+          _dangerColor,
+          'Suplantación detectada',
+          'El sistema detectó que la foto podría ser de una pantalla, una '
+              'foto impresa o de otra persona. Se informa al supervisor.',
+          'Ponte tú frente a la cámara. Nunca uses fotos ni pantallas.',
+        ),
+        _buildConsejo(
+          Icons.pan_tool_rounded,
+          _warningColor,
+          'Gesto incorrecto',
+          'El gesto de la segunda foto no coincide con el que se pidió.',
+          'Lee la instrucción dentro del marco y haz el gesto de forma clara '
+              'antes de tomar la foto.',
+        ),
+        _buildConsejo(
+          Icons.wrong_location_rounded,
+          _dangerColor,
+          'Fuera de la zona',
+          'Tu ubicación GPS no está dentro de la zona del aula de tu clase.',
+          'Marca solo cuando estés en el aula. Revisa la zona tocando la '
+              'ubicación en la tarjeta para ver el mapa.',
+        ),
+        _buildConsejo(
+          Icons.location_off_rounded,
+          _dangerColor,
+          'El GPS está desactivado',
+          'Sin GPS la app no puede verificar dónde estás y no permite marcar.',
+          'Activa la ubicación del teléfono. La app te llevará a los ajustes '
+              'para hacerlo.',
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'En los avisos de error puedes tocar "Reintentar" para repetir el '
+          'marcado completo.',
+          style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConsejo(
+    IconData icono,
+    Color color,
+    String titulo,
+    String causa,
+    String solucion,
+  ) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: color.withValues(alpha: 0.35)),
+      ),
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: Icon(icono, color: color),
+        title: Text(
+          titulo,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: _darkColor,
+          ),
+        ),
+        shape: const Border(),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildLineaConsejo('Por qué aparece', causa),
+          const SizedBox(height: 8),
+          _buildLineaConsejo('Qué hacer', solucion),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLineaConsejo(String etiqueta, String texto) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '$etiqueta: ',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          TextSpan(text: texto),
+        ],
+      ),
+      style: TextStyle(fontSize: 13, color: Colors.grey.shade800, height: 1.4),
+    );
+  }
+
+  // Etapa 9: resumen final
+  Widget _buildEtapaFin() {
+    const pasos = [
+      'Toca el botón azul "Marcar Entrada" en tu clase.',
+      'Confirma tu huella y ten el GPS encendido.',
+      'Toma las 3 fotos: frontal, gesto y constancia del aula.',
+      'Al terminar, marca la salida con el botón rojo y confírmala.',
+    ];
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Icon(Icons.check_circle_rounded,
+                size: 56, color: _successColor),
+            const SizedBox(height: 12),
+            const Text(
+              '¡Listo! Ya conoces el marcado',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: _darkColor,
+              ),
+            ),
+            const SizedBox(height: 16),
+            for (var i = 0; i < pasos.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 12,
+                      backgroundColor: _primaryColor,
+                      child: Text(
+                        '${i + 1}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        pasos[i],
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: Colors.grey.shade800,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 6),
+            Text(
+              'Puedes volver a ver esta guía desde el botón de ayuda del '
+              'Home o en Perfil > Opciones > Guía de uso.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // Etapa 2: la misma tarjeta del Home con la clase de ejemplo
@@ -1406,7 +1602,10 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
                 elevation: 0,
               ),
               child: Text(
-                _esUltima ? 'Ir a mi horario' : 'Siguiente',
+                // [ANTERIOR] _esUltima ? 'Ir a mi horario' : 'Siguiente',
+                _esUltima
+                    ? (Navigator.canPop(context) ? 'Terminar' : 'Ir a mi horario')
+                    : 'Siguiente',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
