@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../models/horario.dart';
+import '../services/biometric_service.dart';
 import '../widgets/home/horario_card_extended.dart';
 import 'home_screen.dart';
 
@@ -28,6 +30,9 @@ enum EtapaGuia {
   fin,
 }
 
+// Estado de cada verificacion previa a la camara (huella, permisos, GPS)
+enum EstadoVerificacion { pendiente, enCurso, ok, fallo }
+
 class GuiaPracticaScreen extends StatefulWidget {
   const GuiaPracticaScreen({super.key});
 
@@ -45,6 +50,16 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
   String _horaInicioDemo = '';
   String _horaFinDemo = '';
 
+  // Verificaciones reales antes de la camara (mismo orden que el Home)
+  final BiometricService _biometricService = BiometricService();
+  bool _verificando = false;
+  EstadoVerificacion _estadoHuella = EstadoVerificacion.pendiente;
+  EstadoVerificacion _estadoPermisos = EstadoVerificacion.pendiente;
+  EstadoVerificacion _estadoGps = EstadoVerificacion.pendiente;
+  String _detalleHuella = 'Se pedirá tu huella o el bloqueo del teléfono.';
+  String _detallePermisos = 'Se pedirá permiso de cámara y de ubicación.';
+  String _detalleGps = 'Se comprobará que el GPS esté encendido.';
+
   // Claves para resaltar las partes de la tarjeta en el tutorial
   final GlobalKey _keyEncabezado = GlobalKey();
   final GlobalKey _keyUbicacion = GlobalKey();
@@ -54,6 +69,8 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
   static const Color _primaryColor = Color(0xFF4A6CF7);
   static const Color _warningColor = Color(0xFFF59E0B);
   static const Color _darkColor = Color(0xFF1A2B4A);
+  static const Color _successColor = Color(0xFF10B981);
+  static const Color _dangerColor = Color(0xFFEF4444);
 
   int get _numeroPaso => _etapa.index + 1;
   int get _totalPasos => EtapaGuia.values.length;
@@ -109,6 +126,100 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
 
     // Si el docente ya esta en la etapa de la tarjeta, mostrar el tutorial
     if (_etapa == EtapaGuia.tarjeta) _mostrarTutorialTarjeta();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Huella y GPS (reales)
+  // ─────────────────────────────────────────────────────────────
+  // Mismo orden que _iniciarMarcado en home_screen.dart:
+  // huella -> permisos de camara y ubicacion -> GPS encendido -> ubicacion.
+  // A diferencia del Home, si algo falla no se bloquea: se explica que
+  // pasaria en la app real y se permite continuar con la practica.
+  Future<void> _iniciarVerificaciones() async {
+    if (_verificando) return;
+    setState(() {
+      _verificando = true;
+      _estadoHuella = EstadoVerificacion.enCurso;
+      _estadoPermisos = EstadoVerificacion.pendiente;
+      _estadoGps = EstadoVerificacion.pendiente;
+      _detalleHuella = 'Coloca tu dedo en el lector o usa el bloqueo del teléfono.';
+      _detallePermisos = 'Se pedirá permiso de cámara y de ubicación.';
+      _detalleGps = 'Se comprobará que el GPS esté encendido.';
+    });
+
+    // 1. Huella
+    final huellaOk = await _biometricService.authenticate();
+    if (!mounted) return;
+    setState(() {
+      _estadoHuella =
+          huellaOk ? EstadoVerificacion.ok : EstadoVerificacion.fallo;
+      _detalleHuella = huellaOk
+          ? 'Identidad confirmada.'
+          : 'No se pudo verificar. En la app real te preguntará si deseas '
+              'continuar sin huella.';
+      _estadoPermisos = EstadoVerificacion.enCurso;
+    });
+
+    // 2. Permisos de camara y ubicacion
+    final camara = await Permission.camera.request();
+    final ubicacion = await Permission.location.request();
+    if (!mounted) return;
+    final faltantes = [
+      if (!camara.isGranted) 'cámara',
+      if (!ubicacion.isGranted) 'ubicación',
+    ];
+    setState(() {
+      _estadoPermisos = faltantes.isEmpty
+          ? EstadoVerificacion.ok
+          : EstadoVerificacion.fallo;
+      _detallePermisos = faltantes.isEmpty
+          ? 'Permisos concedidos.'
+          : 'Falta el permiso de ${faltantes.join(' y ')}. En la app real no '
+              'podrás marcar sin él; actívalo en Ajustes > Aplicaciones.';
+      _estadoGps = EstadoVerificacion.enCurso;
+    });
+
+    // 3. GPS encendido y ubicacion
+    await _verificarGps();
+    if (!mounted) return;
+    setState(() => _verificando = false);
+  }
+
+  Future<void> _verificarGps() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      if (!mounted) return;
+      setState(() {
+        _estadoGps = EstadoVerificacion.fallo;
+        _detalleGps = 'El GPS está apagado. En la app real se abrirán los '
+            'ajustes para que lo actives; sin GPS no se puede marcar.';
+      });
+      return;
+    }
+
+    try {
+      final posicion = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
+      );
+      if (!mounted) return;
+      setState(() {
+        _estadoGps = EstadoVerificacion.ok;
+        _detalleGps = 'Ubicación obtenida (precisión ±'
+            '${posicion.accuracy.toStringAsFixed(0)} m). En la app real se '
+            'envía con las fotos para verificar que estés en el aula.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _estadoGps = EstadoVerificacion.fallo;
+        _detalleGps = 'No se pudo obtener tu ubicación. Acércate a una '
+            'ventana o sal al exterior e inténtalo de nuevo.';
+      });
+    }
+  }
+
+  Future<void> _activarGps() async {
+    await Geolocator.openLocationSettings();
   }
 
   // Boton "Reintentar ubicacion"
@@ -436,11 +547,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
       case EtapaGuia.tarjeta:
         return _buildEtapaTarjeta();
       case EtapaGuia.verificaciones:
-        return _buildTextoEtapa(
-          Icons.fingerprint_rounded,
-          'Huella y GPS',
-          'Pendiente (Fase 3): verificación real de huella y GPS.',
-        );
+        return _buildEtapaVerificaciones();
       case EtapaGuia.fotoFrontal:
         return _buildTextoEtapa(
           Icons.face_rounded,
@@ -509,8 +616,12 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
           // vuelva a calcular la zona y si el docente esta dentro
           key: ValueKey(_demoConUbicacion),
           horario: _horarioDemo!,
-          // Fase 3: aqui se pediran la huella y el GPS reales
-          onMarcarEntrada: () => _irAEtapa(EtapaGuia.verificaciones),
+          // [ANTERIOR] onMarcarEntrada: () => _irAEtapa(EtapaGuia.verificaciones),
+          // Igual que en el Home: al tocar el boton se piden huella y GPS
+          onMarcarEntrada: () {
+            _irAEtapa(EtapaGuia.verificaciones);
+            _iniciarVerificaciones();
+          },
           // Fase 5: dialogo real de confirmacion de salida
           onMarcarSalida: () {},
           keyEncabezado: _keyEncabezado,
@@ -526,6 +637,142 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
         //   ),
         if (!_demoConUbicacion) _buildAvisoSinUbicacion(),
       ],
+    );
+  }
+
+  // Etapa 3: huella, permisos y GPS
+  Widget _buildEtapaVerificaciones() {
+    final sinIniciar = _estadoHuella == EstadoVerificacion.pendiente;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Antes de abrir la cámara, la app comprueba que seas tú y que '
+          'estés en el aula:',
+          style: TextStyle(fontSize: 14, color: _darkColor, height: 1.4),
+        ),
+        const SizedBox(height: 12),
+        _buildFilaVerificacion(
+          Icons.fingerprint_rounded,
+          '1. Huella',
+          _estadoHuella,
+          _detalleHuella,
+        ),
+        _buildFilaVerificacion(
+          Icons.verified_user_rounded,
+          '2. Permisos',
+          _estadoPermisos,
+          _detallePermisos,
+        ),
+        _buildFilaVerificacion(
+          Icons.location_on_rounded,
+          '3. GPS',
+          _estadoGps,
+          _detalleGps,
+        ),
+        const SizedBox(height: 4),
+        if (!_verificando)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (_estadoGps == EstadoVerificacion.fallo)
+                OutlinedButton.icon(
+                  onPressed: _activarGps,
+                  icon: const Icon(Icons.settings_rounded, size: 18),
+                  label: const Text('Activar GPS'),
+                ),
+              OutlinedButton.icon(
+                onPressed: _iniciarVerificaciones,
+                icon: Icon(
+                  sinIniciar ? Icons.play_arrow_rounded : Icons.refresh_rounded,
+                  size: 18,
+                ),
+                label: Text(
+                  sinIniciar ? 'Iniciar verificación' : 'Repetir verificación',
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFilaVerificacion(
+    IconData icono,
+    String titulo,
+    EstadoVerificacion estado,
+    String detalle,
+  ) {
+    final Color color;
+    final Widget indicador;
+    switch (estado) {
+      case EstadoVerificacion.pendiente:
+        color = Colors.grey;
+        indicador = const Icon(Icons.radio_button_unchecked_rounded,
+            color: Colors.grey, size: 22);
+      case EstadoVerificacion.enCurso:
+        color = _primaryColor;
+        indicador = const SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        );
+      case EstadoVerificacion.ok:
+        color = _successColor;
+        indicador = const Icon(Icons.check_circle_rounded,
+            color: _successColor, size: 22);
+      case EstadoVerificacion.fallo:
+        color = _dangerColor;
+        indicador =
+            const Icon(Icons.cancel_rounded, color: _dangerColor, size: 22);
+    }
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: color.withValues(alpha: 0.35)),
+      ),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icono, color: color, size: 26),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    titulo,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _darkColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    detalle,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: Colors.grey.shade700,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            indicador,
+          ],
+        ),
+      ),
     );
   }
 
@@ -633,7 +880,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
           if (!_esPrimera)
             Expanded(
               child: OutlinedButton(
-                onPressed: _anterior,
+                onPressed: _verificando ? null : _anterior,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -646,7 +893,9 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
           if (!_esPrimera) const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: _esUltima ? _finalizar : _siguiente,
+              onPressed: _verificando
+                  ? null
+                  : (_esUltima ? _finalizar : _siguiente),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryColor,
                 foregroundColor: Colors.white,
