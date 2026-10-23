@@ -23,6 +23,8 @@ import '../widgets/home/error_state.dart';
 import '../widgets/home/camera_marcado_screen.dart';
 import '../widgets/common/custom_snackbar.dart';
 import '../widgets/common/loading_dialog.dart';
+// [ACTUAL] Gestos compartidos con el modo practico de la guia
+import '../utils/gestos.dart';
 import 'login_screen.dart';
 import 'historial_screen.dart';
 import 'perfil_screen.dart';
@@ -257,7 +259,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _isCameraReady = false;
     });
 
-    _gestoSolicitado = _generarGestoAleatorio();
+    // [ANTERIOR] _gestoSolicitado = _generarGestoAleatorio();
+    _gestoSolicitado = generarGestoAleatorio();
     _etapaFoto = 'frontal';
     CustomSnackbar.showInfo(context, 'Toma tu foto frontal');
     await _abrirCamara();
@@ -367,8 +370,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (_etapaFoto == 'frontal') {
         final processedFile = await _processImageInIsolate(File(photo.path));
         _fotoFrontal = processedFile;
-        final instruccionGesto = _instruccionGesto(_gestoSolicitado!);
-        await _switchToNextStage('gesto', instruccionGesto);
+        // [ANTERIOR] final instruccionGesto = _instruccionGesto(_gestoSolicitado!);
+        // [ANTERIOR] await _switchToNextStage('gesto', instruccionGesto);
+        final instruccion = instruccionGesto(_gestoSolicitado!);
+        await _switchToNextStage('gesto', instruccion);
         return;
       }
 
@@ -638,7 +643,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Realiza el gesto: ${_instruccionGesto(_gestoSolicitado!)}',
+                      // [ANTERIOR] 'Realiza el gesto: ${_instruccionGesto(_gestoSolicitado!)}',
+                      'Realiza el gesto: ${instruccionGesto(_gestoSolicitado!)}',
                       style: TextStyle(
                         fontSize: 13,
                         color: _warningColor,
@@ -857,26 +863,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  String _generarGestoAleatorio() {
-    final gestos = ['arriba', 'abajo', 'izquierda', 'derecha'];
-    final random = DateTime.now().millisecondsSinceEpoch % gestos.length;
-    return gestos[random.toInt()];
-  }
-
-  String _instruccionGesto(String gesto) {
-    switch (gesto) {
-      case 'arriba':
-        return 'Por favor, mire hacia arriba';
-      case 'abajo':
-        return 'Por favor, mire hacia abajo';
-      case 'izquierda':
-        return 'Por favor, gire a la izquierda';
-      case 'derecha':
-        return 'Por favor, gire a la derecha';
-      default:
-        return 'Por favor, mire al frente';
-    }
-  }
+  // ==========================================================================
+  // [ANTERIOR] Gestos como metodos privados de esta pantalla.
+  // Se movieron a lib/utils/gestos.dart (generarGestoAleatorio e
+  // instruccionGesto) para reutilizarlos en el modo practico de la guia.
+  // ==========================================================================
+  // String _generarGestoAleatorio() {
+  //   final gestos = ['arriba', 'abajo', 'izquierda', 'derecha'];
+  //   final random = DateTime.now().millisecondsSinceEpoch % gestos.length;
+  //   return gestos[random.toInt()];
+  // }
+  //
+  // String _instruccionGesto(String gesto) {
+  //   switch (gesto) {
+  //     case 'arriba':
+  //       return 'Por favor, mire hacia arriba';
+  //     case 'abajo':
+  //       return 'Por favor, mire hacia abajo';
+  //     case 'izquierda':
+  //       return 'Por favor, gire a la izquierda';
+  //     case 'derecha':
+  //       return 'Por favor, gire a la derecha';
+  //     default:
+  //       return 'Por favor, mire al frente';
+  //   }
+  // }
 
   Future<void> _cerrarSesion() async {
     final confirmar = await showDialog<bool>(
@@ -933,7 +944,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         // cameras: _cameras,
         etapaFoto: _etapaFoto ?? 'frontal',
         gestoSolicitado: _gestoSolicitado,
-        instruccionGesto: _instruccionGesto,
+        // [ANTERIOR] instruccionGesto: _instruccionGesto,
+        instruccionGesto: instruccionGesto,
         onCapture: _capturarYMarcar,
         onCancel: _cancelarCamara,
         // onCameraChanged: (newController) {
