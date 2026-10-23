@@ -76,6 +76,10 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   final GlobalKey _keyUbicacion = GlobalKey();
   final GlobalKey _keyEstado = GlobalKey();
   final GlobalKey _keyBotones = GlobalKey();
+  final GlobalKey _keySalida = GlobalKey();
+
+  // Clase de ejemplo para practicar la salida (entrada ya marcada)
+  Horario? _horarioSalidaDemo;
 
   static const Color _primaryColor = Color(0xFF4A6CF7);
   static const Color _warningColor = Color(0xFFF59E0B);
@@ -222,6 +226,10 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   void _irAEtapa(EtapaGuia etapa) {
     setState(() => _etapa = etapa);
     if (etapa == EtapaGuia.tarjeta) _mostrarTutorialTarjeta();
+    if (etapa == EtapaGuia.salida) {
+      _prepararSalidaDemo();
+      _mostrarTutorialSalida();
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -348,6 +356,63 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     await Geolocator.openLocationSettings();
   }
 
+  // ─────────────────────────────────────────────────────────────
+  //  Salida
+  // ─────────────────────────────────────────────────────────────
+  // La misma clase de ejemplo con la entrada ya marcada. Termina 10 min
+  // despues de llegar a esta etapa, asi el boton rojo queda habilitado
+  // (se permite desde 30 min antes hasta 30 min despues del fin).
+  void _prepararSalidaDemo() {
+    final ahora = DateTime.now();
+    final inicioDia = DateTime(ahora.year, ahora.month, ahora.day);
+    final finDia = DateTime(ahora.year, ahora.month, ahora.day, 23, 59);
+
+    // La tarjeta calcula las horas sobre el dia de hoy
+    var inicio = ahora.subtract(const Duration(hours: 2));
+    if (inicio.isBefore(inicioDia)) inicio = inicioDia;
+    var fin = ahora.add(const Duration(minutes: 10));
+    if (fin.isAfter(finDia)) fin = finDia;
+
+    final formato = DateFormat('HH:mm');
+    final base = _horarioDemo ??
+        Horario(
+          id: 0,
+          diaSemana: '',
+          horaInicio: '',
+          horaFin: '',
+          materia: 'Clase de ejemplo',
+          paralelo: 'A',
+          ubicacion: 'Aula de ejemplo',
+          paraleloMateriaId: 0,
+          ubicacionId: 0,
+          yaMarcoEntrada: false,
+          yaMarcoSalida: false,
+          ubicacionNombre: 'Aula de ejemplo',
+        );
+
+    setState(() {
+      _horarioSalidaDemo = base.copyWith(
+        horaInicio: formato.format(inicio),
+        horaFin: formato.format(fin),
+        yaMarcoEntrada: true,
+        yaMarcoSalida: false,
+      );
+    });
+  }
+
+  // El docente confirmo el dialogo real de salida
+  void _salidaPracticada() {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text(
+        '¡Salida confirmada! En la app real ahora se repiten la huella, '
+        'el GPS y las 3 fotos, igual que en la entrada.',
+      ),
+      backgroundColor: _successColor,
+      duration: Duration(seconds: 4),
+    ));
+    _siguiente();
+  }
+
   // Boton "Reintentar ubicacion"
   Future<void> _reintentarUbicacion() async {
     if (_buscandoUbicacion) return;
@@ -472,18 +537,72 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
           'Cuando llegues a tu clase, tócalo. Primero te pedirá tu huella y '
               'el GPS, y luego abrirá la cámara. ¡Pruébalo ahora!',
         ),
-      ].where((t) => t.keyTarget?.currentContext != null).toList();
+      ];
 
-      if (targets.isEmpty) return;
-
-      TutorialCoachMark(
-        targets: targets,
-        colorShadow: Colors.black87,
-        opacityShadow: 0.8,
-        paddingFocus: 8,
-        textSkip: 'SALTAR',
-      ).show(context: context);
+      // [ANTERIOR] Se movio a _mostrarTargets() para reutilizarlo en la salida
+      // ].where((t) => t.keyTarget?.currentContext != null).toList();
+      //
+      // if (targets.isEmpty) return;
+      //
+      // TutorialCoachMark(
+      //   targets: targets,
+      //   colorShadow: Colors.black87,
+      //   opacityShadow: 0.8,
+      //   paddingFocus: 8,
+      //   textSkip: 'SALTAR',
+      // ).show(context: context);
+      _mostrarTargets(targets);
     });
+  }
+
+  // Tutorial sobre la tarjeta de salida (etapa 7)
+  void _mostrarTutorialSalida() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted || _etapa != EtapaGuia.salida) return;
+
+      _mostrarTargets([
+        _crearTarget(
+          'encabezado_salida',
+          _keyEncabezado,
+          ContentAlign.bottom,
+          'Clase en curso',
+          'Después de marcar la entrada, la tarjeta se pone naranja y '
+              'muestra "En curso".',
+        ),
+        _crearTarget(
+          'temporizador_salida',
+          _keySalida,
+          ContentAlign.bottom,
+          'Temporizador de salida',
+          'Te indica cuánto falta para que termine la clase.',
+        ),
+        _crearTarget(
+          'boton_salida',
+          _keyBotones,
+          ContentAlign.top,
+          'Botón rojo: Marcar Salida',
+          'Solo se habilita desde 30 minutos antes hasta 30 minutos después '
+              'del fin de la clase. Al tocarlo te pedirá confirmar. '
+              '¡Pruébalo ahora!',
+        ),
+      ]);
+    });
+  }
+
+  // Muestra el tutorial solo con las partes que ya estan dibujadas
+  void _mostrarTargets(List<TargetFocus> targets) {
+    final visibles =
+        targets.where((t) => t.keyTarget?.currentContext != null).toList();
+    if (visibles.isEmpty) return;
+
+    TutorialCoachMark(
+      targets: visibles,
+      colorShadow: Colors.black87,
+      opacityShadow: 0.8,
+      paddingFocus: 8,
+      textSkip: 'SALTAR',
+    ).show(context: context);
   }
 
   TargetFocus _crearTarget(
@@ -721,11 +840,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
           ],
         );
       case EtapaGuia.salida:
-        return _buildTextoEtapa(
-          Icons.logout_rounded,
-          'Marcar salida',
-          'Pendiente (Fase 5): diálogo real de confirmación de salida.',
-        );
+        return _buildEtapaSalida();
       case EtapaGuia.consejos:
         return _buildTextoEtapa(
           Icons.lightbulb_rounded,
@@ -791,6 +906,120 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
         //   ),
         if (!_demoConUbicacion) _buildAvisoSinUbicacion(),
       ],
+    );
+  }
+
+  // Etapa 7: tarjeta con la entrada marcada y el dialogo real de salida
+  Widget _buildEtapaSalida() {
+    if (_horarioSalidaDemo == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Al terminar tu clase marcas la salida desde la misma tarjeta. '
+          'Toca "Marcar Salida" para ver la confirmación.',
+          style: TextStyle(fontSize: 14, color: _darkColor, height: 1.4),
+        ),
+        const SizedBox(height: 12),
+        _buildReglaSalida(),
+        const SizedBox(height: 12),
+        HorarioCardExtended(
+          key: const ValueKey('salida'),
+          horario: _horarioSalidaDemo!,
+          onMarcarEntrada: () {},
+          // Se llama solo si el docente confirma el dialogo real de salida
+          onMarcarSalida: _salidaPracticada,
+          keyEncabezado: _keyEncabezado,
+          keyBotones: _keyBotones,
+          keySalida: _keySalida,
+        ),
+      ],
+    );
+  }
+
+  // Linea de tiempo de la regla de los 30 minutos
+  Widget _buildReglaSalida() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _primaryColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.schedule_rounded, color: _primaryColor, size: 18),
+              SizedBox(width: 6),
+              Text(
+                '¿Cuándo puedo marcar la salida?',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: _darkColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildTramo('Antes', Colors.grey.shade400, 'Deshabilitado'),
+              _buildTramo('30 min antes → 30 min después del fin',
+                  _successColor, 'Habilitado',
+                  flex: 2),
+              _buildTramo('Después', Colors.grey.shade400, 'Deshabilitado'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Si sales antes o después de la hora de fin, el diálogo de '
+            'confirmación te indica la diferencia en minutos.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTramo(String texto, Color color, String estado,
+      {int flex = 1}) {
+    return Expanded(
+      flex: flex,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Column(
+          children: [
+            Container(
+              height: 8,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              estado,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: color == _successColor
+                    ? _successColor
+                    : Colors.grey.shade600,
+              ),
+            ),
+            Text(
+              texto,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

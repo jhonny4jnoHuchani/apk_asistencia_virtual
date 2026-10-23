@@ -51,6 +51,7 @@ class HorarioCardExtended extends StatefulWidget {
   final GlobalKey? keyUbicacion;
   final GlobalKey? keyEstado;
   final GlobalKey? keyBotones;
+  final GlobalKey? keySalida;
 
   const HorarioCardExtended({
     super.key,
@@ -61,6 +62,7 @@ class HorarioCardExtended extends StatefulWidget {
     this.keyUbicacion,
     this.keyEstado,
     this.keyBotones,
+    this.keySalida,
   });
 
   @override
@@ -545,7 +547,9 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended>
                 _buildProgressBar(),
                 // [ANTERIOR] _buildEstado(),
                 _conClave(widget.keyEstado, _buildEstado()),
-                if (_mostrarTemporizadorSalida) _buildEstadoSalidaDetallado(),
+                // [ANTERIOR] if (_mostrarTemporizadorSalida) _buildEstadoSalidaDetallado(),
+                if (_mostrarTemporizadorSalida)
+                  _conClave(widget.keySalida, _buildEstadoSalidaDetallado()),
                 if (_tiempoTrabajado.inMinutes > 0) _buildTiempoTrabajado(),
                 const SizedBox(height: 12),
                 // [ANTERIOR] _buildBotones(),
