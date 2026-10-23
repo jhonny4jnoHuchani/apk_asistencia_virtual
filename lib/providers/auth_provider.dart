@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-// [ANTERIOR] Se usaba para obtener el ID del dispositivo (ver _getDeviceId)
-// import 'package:device_info_plus/device_info_plus.dart';
+// [ACTUAL] Necesario para obtener el ID del dispositivo (ver _getDeviceId)
+import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
-// [ACTUAL] Necesario para Random.secure() al generar el ID de instalacion
-import 'dart:math';
+// [DESACTIVADO] Se usaba para Random.secure() al generar el ID de instalacion
+// import 'dart:math';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/reconocimiento_service.dart';
@@ -254,66 +254,70 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ==========================================================================
-  // [ANTERIOR] ID del dispositivo (desactivado el 22/10/2026)
-  // En Android, androidInfo.id corresponde a Build.ID: el codigo de version
-  // del sistema operativo (ej. "UP1A.231005.007"). Es igual en todos los
-  // equipos con el mismo firmware y cambia al actualizar Android, por lo que
-  // no identifica a un telefono en particular.
+  // [ACTUAL] ID del dispositivo (reactivado el 23/10/2026)
+  // Se volvio a esta version porque el backend valida el device_id en el
+  // login: con el ID de instalacion, al reinstalar la app en Android se
+  // generaba un ID nuevo y el usuario quedaba bloqueado.
+  // Nota: en Android, androidInfo.id corresponde a Build.ID (codigo de
+  // version del sistema, ej. "UP1A.231005.007"), igual en equipos con el
+  // mismo firmware y cambia al actualizar Android.
   // ==========================================================================
-  // Future<String> _getDeviceId() async {
-  //   try {
-  //     final deviceInfo = DeviceInfoPlugin();
-  //     if (Platform.isAndroid) {
-  //       final androidInfo = await deviceInfo.androidInfo;
-  //       return androidInfo.id;
-  //     } else if (Platform.isIOS) {
-  //       final iosInfo = await deviceInfo.iosInfo;
-  //       return iosInfo.identifierForVendor ?? 'unknown';
-  //     }
-  //   } catch (e) {
-  //     // Si falla, generar un ID unico
-  //   }
-  //   return 'device_${DateTime.now().millisecondsSinceEpoch}';
-  // }
-
-  // ==========================================================================
-  // [ACTUAL] ID de la instalacion (activo desde el 22/10/2026)
-  // ==========================================================================
-  // Obtener ID unico de la instalacion.
-  // Se genera un UUID v4 la primera vez y se guarda en el almacenamiento
-  // seguro (Keystore/Keychain), asi se mantiene entre sesiones y logout,
-  // y cambia solo si la app se desinstala o se borran sus datos.
-  static const String _installationIdKey = 'installation_id';
-
   Future<String> _getDeviceId() async {
     try {
-      final stored = await _storage.read(key: _installationIdKey);
-      if (stored != null && stored.isNotEmpty) return stored;
+      final deviceInfo = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        return androidInfo.id;
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        return iosInfo.identifierForVendor ?? 'unknown';
+      }
     } catch (e) {
-      // Datos ilegibles (ej. restaurados de un backup sin la clave del
-      // Keystore): se descartan y se genera un ID nuevo
-      await _storage.delete(key: _installationIdKey).catchError((_) {});
+      // Si falla, generar un ID unico
     }
-
-    final nuevoId = _generarUuidV4();
-    try {
-      await _storage.write(key: _installationIdKey, value: nuevoId);
-    } catch (e) {
-      // Si no se puede guardar, se usa igual para este login
-    }
-    return nuevoId;
+    return 'device_${DateTime.now().millisecondsSinceEpoch}';
   }
 
-  String _generarUuidV4() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
-    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variante RFC 4122
-    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
-        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
-        '${hex.substring(20)}';
-  }
+  // ==========================================================================
+  // [DESACTIVADO] ID de la instalacion (usado del 22/10/2026 al 23/10/2026)
+  // Motivo: en Android cambia al desinstalar/reinstalar la app y el backend
+  // bloquea el login al recibir un device_id distinto.
+  // ==========================================================================
+  // // Obtener ID unico de la instalacion.
+  // // Se genera un UUID v4 la primera vez y se guarda en el almacenamiento
+  // // seguro (Keystore/Keychain), asi se mantiene entre sesiones y logout,
+  // // y cambia solo si la app se desinstala o se borran sus datos.
+  // static const String _installationIdKey = 'installation_id';
+  //
+  // Future<String> _getDeviceId() async {
+  //   try {
+  //     final stored = await _storage.read(key: _installationIdKey);
+  //     if (stored != null && stored.isNotEmpty) return stored;
+  //   } catch (e) {
+  //     // Datos ilegibles (ej. restaurados de un backup sin la clave del
+  //     // Keystore): se descartan y se genera un ID nuevo
+  //     await _storage.delete(key: _installationIdKey).catchError((_) {});
+  //   }
+  //
+  //   final nuevoId = _generarUuidV4();
+  //   try {
+  //     await _storage.write(key: _installationIdKey, value: nuevoId);
+  //   } catch (e) {
+  //     // Si no se puede guardar, se usa igual para este login
+  //   }
+  //   return nuevoId;
+  // }
+  //
+  // String _generarUuidV4() {
+  //   final random = Random.secure();
+  //   final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+  //   bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  //   bytes[8] = (bytes[8] & 0x3f) | 0x80; // variante RFC 4122
+  //   final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  //   return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+  //       '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
+  //       '${hex.substring(20)}';
+  // }
 
 // NUEVO MÉTODO: Establecer contraseña después del registro facial
   Future<bool> setPassword({
