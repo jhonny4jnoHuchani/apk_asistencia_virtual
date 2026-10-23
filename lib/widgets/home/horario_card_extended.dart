@@ -45,11 +45,22 @@ class HorarioCardExtended extends StatefulWidget {
   final VoidCallback onMarcarEntrada;
   final VoidCallback onMarcarSalida;
 
+  // Claves opcionales para que la guia de uso (modo practico) pueda
+  // resaltar cada parte de la tarjeta. En el Home no se usan (null).
+  final GlobalKey? keyEncabezado;
+  final GlobalKey? keyUbicacion;
+  final GlobalKey? keyEstado;
+  final GlobalKey? keyBotones;
+
   const HorarioCardExtended({
     super.key,
     required this.horario,
     required this.onMarcarEntrada,
     required this.onMarcarSalida,
+    this.keyEncabezado,
+    this.keyUbicacion,
+    this.keyEstado,
+    this.keyBotones,
   });
 
   @override
@@ -521,26 +532,36 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(),
+          // [ANTERIOR] _buildHeader(),
+          _conClave(widget.keyEncabezado, _buildHeader()),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInfoRow(),
+                // [ANTERIOR] _buildInfoRow(),
+                _conClave(widget.keyUbicacion, _buildInfoRow()),
                 if (_ubicacionHabilitada) _buildMapaWidget(),
                 _buildProgressBar(),
-                _buildEstado(),
+                // [ANTERIOR] _buildEstado(),
+                _conClave(widget.keyEstado, _buildEstado()),
                 if (_mostrarTemporizadorSalida) _buildEstadoSalidaDetallado(),
                 if (_tiempoTrabajado.inMinutes > 0) _buildTiempoTrabajado(),
                 const SizedBox(height: 12),
-                _buildBotones(),
+                // [ANTERIOR] _buildBotones(),
+                _conClave(widget.keyBotones, _buildBotones()),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  // Envuelve una parte de la tarjeta con su clave de la guia (si la hay)
+  Widget _conClave(GlobalKey? key, Widget child) {
+    if (key == null) return child;
+    return KeyedSubtree(key: key, child: child);
   }
 
   // HEADER con gradiente y estado
