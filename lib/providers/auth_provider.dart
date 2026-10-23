@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+// [ANTERIOR] Se usaba para obtener el ID del dispositivo (ver _getDeviceId)
+// import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
+// [ACTUAL] Necesario para Random.secure() al generar el ID de instalacion
 import 'dart:math';
 import '../models/user.dart';
 import '../services/auth_service.dart';
@@ -250,6 +253,32 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ==========================================================================
+  // [ANTERIOR] ID del dispositivo (desactivado el 22/10/2026)
+  // En Android, androidInfo.id corresponde a Build.ID: el codigo de version
+  // del sistema operativo (ej. "UP1A.231005.007"). Es igual en todos los
+  // equipos con el mismo firmware y cambia al actualizar Android, por lo que
+  // no identifica a un telefono en particular.
+  // ==========================================================================
+  // Future<String> _getDeviceId() async {
+  //   try {
+  //     final deviceInfo = DeviceInfoPlugin();
+  //     if (Platform.isAndroid) {
+  //       final androidInfo = await deviceInfo.androidInfo;
+  //       return androidInfo.id;
+  //     } else if (Platform.isIOS) {
+  //       final iosInfo = await deviceInfo.iosInfo;
+  //       return iosInfo.identifierForVendor ?? 'unknown';
+  //     }
+  //   } catch (e) {
+  //     // Si falla, generar un ID unico
+  //   }
+  //   return 'device_${DateTime.now().millisecondsSinceEpoch}';
+  // }
+
+  // ==========================================================================
+  // [ACTUAL] ID de la instalacion (activo desde el 22/10/2026)
+  // ==========================================================================
   // Obtener ID unico de la instalacion.
   // Se genera un UUID v4 la primera vez y se guarda en el almacenamiento
   // seguro (Keystore/Keychain), asi se mantiene entre sesiones y logout,
