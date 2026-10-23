@@ -12,7 +12,8 @@ import 'screens/login_screen.dart';
 import 'screens/cambio_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/registro_facial_screen.dart';
-import 'screens/guia_demo_screen.dart';
+// [ANTERIOR] import 'screens/guia_demo_screen.dart';
+import 'screens/guia_practica_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'deep_link_state.dart';
@@ -306,7 +307,8 @@ class _SplashScreenState extends State<SplashScreen>
     final yaVioTutorial = prefs.getBool('ya_vio_tutorial') ?? false;
 
     if (!yaVioTutorial) {
-      _irA(const GuiaDemoScreen());
+      // [ANTERIOR] _irA(const GuiaDemoScreen());
+      _irA(const GuiaPracticaScreen());
     } else {
       _irA(const HomeScreen());
     }

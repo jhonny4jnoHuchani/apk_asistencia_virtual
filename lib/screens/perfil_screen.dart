@@ -10,7 +10,8 @@ import '../providers/auth_provider.dart';
 import 'cambio_password_screen.dart';
 import 'registro_facial_screen.dart';
 import 'login_screen.dart';
-import 'guia_demo_screen.dart';
+// [ANTERIOR] import 'guia_demo_screen.dart';
+import 'guia_practica_screen.dart';
 
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
@@ -1275,7 +1276,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const GuiaDemoScreen()),
+                  // [ANTERIOR] MaterialPageRoute(builder: (_) => const GuiaDemoScreen()),
+                  MaterialPageRoute(builder: (_) => const GuiaPracticaScreen()),
                 );
               },
             ),

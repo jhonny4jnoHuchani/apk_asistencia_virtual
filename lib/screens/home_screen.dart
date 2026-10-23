@@ -9,7 +9,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
-import 'guia_demo_screen.dart';
+// [ANTERIOR] import 'guia_demo_screen.dart';
+import 'guia_practica_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/horario_provider.dart';
 import '../services/marcado_service.dart';
@@ -959,7 +960,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       appBar: HomeAppBar(
         onHelp: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const GuiaDemoScreen()),
+          // [ANTERIOR] MaterialPageRoute(builder: (_) => const GuiaDemoScreen()),
+          MaterialPageRoute(builder: (_) => const GuiaPracticaScreen()),
         ),
         onRegistroFacial: () => Navigator.push(
           context,
