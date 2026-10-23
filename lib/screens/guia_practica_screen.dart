@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../models/horario.dart';
 import '../services/biometric_service.dart';
+import '../utils/gestos.dart';
+import '../widgets/home/camera_marcado_screen.dart';
 import '../widgets/home/horario_card_extended.dart';
 import 'home_screen.dart';
 
@@ -40,7 +43,8 @@ class GuiaPracticaScreen extends StatefulWidget {
   State<GuiaPracticaScreen> createState() => _GuiaPracticaScreenState();
 }
 
-class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
+class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
+    with WidgetsBindingObserver {
   EtapaGuia _etapa = EtapaGuia.intro;
 
   // Clase de ejemplo que se muestra en la tarjeta real
@@ -59,6 +63,13 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
   String _detalleHuella = 'Se pedirá tu huella o el bloqueo del teléfono.';
   String _detallePermisos = 'Se pedirá permiso de cámara y de ubicación.';
   String _detalleGps = 'Se comprobará que el GPS esté encendido.';
+
+  // Camara real de practica (no se toman ni se envian fotos)
+  CameraController? _cameraController;
+  bool _mostrarCamara = false;
+  bool _abriendoCamara = false;
+  String _gestoDemo = generarGestoAleatorio();
+  final Set<EtapaGuia> _fotosPracticadas = {};
 
   // Claves para resaltar las partes de la tarjeta en el tutorial
   final GlobalKey _keyEncabezado = GlobalKey();
@@ -80,7 +91,122 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _prepararClaseDemo();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cameraController?.dispose();
+    super.dispose();
+  }
+
+  // Igual que el Home: si la app pasa a segundo plano se libera la camara
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) _cerrarCamara();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Camara real (3 fotos de practica)
+  // ─────────────────────────────────────────────────────────────
+  // Mismas etapas que el marcado real: 'frontal' y 'gesto' con la camara
+  // delantera, 'constancia' con la trasera.
+  String get _etapaCamara {
+    switch (_etapa) {
+      case EtapaGuia.fotoGesto:
+        return 'gesto';
+      case EtapaGuia.fotoConstancia:
+        return 'constancia';
+      default:
+        return 'frontal';
+    }
+  }
+
+  Future<void> _abrirCamara() async {
+    if (_abriendoCamara) return;
+    setState(() => _abriendoCamara = true);
+
+    // Al empezar la secuencia se elige un gesto nuevo, como en el Home
+    if (_etapa == EtapaGuia.fotoFrontal) _gestoDemo = generarGestoAleatorio();
+
+    try {
+      final permiso = await Permission.camera.request();
+      if (!permiso.isGranted) {
+        throw Exception('Se necesita permiso de cámara');
+      }
+
+      final camaras = await availableCameras();
+      if (camaras.isEmpty) throw Exception('No se encontró cámara');
+
+      final lente = _etapaCamara == 'constancia'
+          ? CameraLensDirection.back
+          : CameraLensDirection.front;
+      final seleccionada = camaras.firstWhere(
+        (c) => c.lensDirection == lente,
+        orElse: () => camaras.first,
+      );
+
+      final controller = CameraController(
+        seleccionada,
+        ResolutionPreset.high,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
+      await controller.initialize();
+
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() {
+        _cameraController = controller;
+        _mostrarCamara = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          'No se pudo abrir la cámara: '
+          '${e.toString().replaceAll('Exception: ', '')}',
+        ),
+        backgroundColor: _dangerColor,
+      ));
+    } finally {
+      if (mounted) setState(() => _abriendoCamara = false);
+    }
+  }
+
+  // Se libera la camara despues de quitarla de la pantalla
+  void _cerrarCamara() {
+    final controller = _cameraController;
+    if (controller == null) return;
+    setState(() {
+      _mostrarCamara = false;
+      _cameraController = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+  }
+
+  // Boton de captura: en la practica no se toma ni se guarda la foto,
+  // solo se avanza a la siguiente etapa
+  void _fotoPracticada() {
+    final etapaActual = _etapa;
+    _cerrarCamara();
+    _fotosPracticadas.add(etapaActual);
+
+    final mensajes = {
+      EtapaGuia.fotoFrontal: '¡Foto frontal practicada! Ahora el gesto.',
+      EtapaGuia.fotoGesto: '¡Gesto practicado! Ahora la foto del aula.',
+      EtapaGuia.fotoConstancia: '¡Las 3 fotos practicadas!',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(mensajes[etapaActual] ?? '¡Foto practicada!'),
+      backgroundColor: _successColor,
+      duration: const Duration(seconds: 2),
+    ));
+    _siguiente();
   }
 
   void _siguiente() {
@@ -428,6 +554,18 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Igual que el Home: la camara ocupa toda la pantalla
+    if (_mostrarCamara && _cameraController != null) {
+      return CameraMarcadoScreen(
+        cameraController: _cameraController!,
+        etapaFoto: _etapaCamara,
+        gestoSolicitado: _gestoDemo,
+        instruccionGesto: instruccionGesto,
+        onCapture: _fotoPracticada,
+        onCancel: _cerrarCamara,
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
@@ -549,22 +687,38 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
       case EtapaGuia.verificaciones:
         return _buildEtapaVerificaciones();
       case EtapaGuia.fotoFrontal:
-        return _buildTextoEtapa(
+        return _buildEtapaFoto(
           Icons.face_rounded,
-          'Foto 1: frontal',
-          'Pendiente (Fase 4): cámara real, foto frontal.',
+          'Foto 1 de 3: frontal',
+          'Se usa la cámara delantera.',
+          const [
+            'Centra tu rostro dentro del marco.',
+            'Busca buena iluminación y mira directo a la cámara.',
+            'Quítate los lentes: pueden impedir el reconocimiento.',
+          ],
         );
       case EtapaGuia.fotoGesto:
-        return _buildTextoEtapa(
+        return _buildEtapaFoto(
           Icons.pan_tool_rounded,
-          'Foto 2: gesto',
-          'Pendiente (Fase 4): cámara real, gesto al azar.',
+          'Foto 2 de 3: gesto',
+          'Se usa la cámara delantera.',
+          [
+            'Comprueba que eres una persona real y no una foto.',
+            'El gesto cambia en cada marcado. En esta práctica te tocó: '
+                '"${instruccionGesto(_gestoDemo)}".',
+            'La instrucción aparece dentro del marco de la cámara.',
+          ],
         );
       case EtapaGuia.fotoConstancia:
-        return _buildTextoEtapa(
+        return _buildEtapaFoto(
           Icons.photo_camera_rounded,
-          'Foto 3: constancia del aula',
-          'Pendiente (Fase 4): cámara trasera, foto del aula.',
+          'Foto 3 de 3: constancia del aula',
+          'Se usa la cámara trasera.',
+          const [
+            'Toma una foto del aula donde estás dando la clase.',
+            'Encuadra el entorno completo.',
+            'Si hay poca luz, puedes activar el flash.',
+          ],
         );
       case EtapaGuia.salida:
         return _buildTextoEtapa(
@@ -637,6 +791,123 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
         //   ),
         if (!_demoConUbicacion) _buildAvisoSinUbicacion(),
       ],
+    );
+  }
+
+  // Etapas 4, 5 y 6: explicacion de cada foto y boton para abrir la camara
+  Widget _buildEtapaFoto(
+    IconData icono,
+    String titulo,
+    String camara,
+    List<String> consejos,
+  ) {
+    final practicada = _fotosPracticadas.contains(_etapa);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icono, size: 36, color: _primaryColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titulo,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: _darkColor,
+                        ),
+                      ),
+                      Text(
+                        camara,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (practicada)
+                  const Icon(Icons.check_circle_rounded,
+                      color: _successColor, size: 26),
+              ],
+            ),
+            const SizedBox(height: 14),
+            for (final consejo in consejos)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.lightbulb_outline_rounded,
+                        color: _warningColor, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        consejo,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: Colors.grey.shade800,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 8),
+            Text(
+              'Es solo práctica: la foto no se guarda ni se envía.',
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _abriendoCamara ? null : _abrirCamara,
+                icon: _abriendoCamara
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.camera_alt_rounded),
+                label: Text(practicada ? 'Repetir foto' : 'Abrir cámara'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -880,7 +1151,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
           if (!_esPrimera)
             Expanded(
               child: OutlinedButton(
-                onPressed: _verificando ? null : _anterior,
+                onPressed: (_verificando || _abriendoCamara) ? null : _anterior,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -893,7 +1164,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen> {
           if (!_esPrimera) const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: _verificando
+              onPressed: (_verificando || _abriendoCamara)
                   ? null
                   : (_esUltima ? _finalizar : _siguiente),
               style: ElevatedButton.styleFrom(
