@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -19,15 +21,23 @@ import 'home_screen.dart';
 // La guia recorre el marcado real paso a paso usando las mismas pantallas
 // de la app (tarjeta de horario y camara de marcado) con una clase de
 // ejemplo, sin enviar nada al servidor.
+//
+// [25/10] Igual que el marcado real: al tocar Marcar Entrada o Marcar
+// Salida se verifican huella, permisos y GPS y la camara se abre sola con
+// las 3 fotos seguidas. Textos acortados a pedido del supervisor (textos
+// anteriores en el commit 007ee99).
 
-// Etapas del recorrido, en el orden en que se muestran
+// Etapas del recorrido, en el orden en que se muestran.
+// verificaciones se usa dos veces: para la entrada y para la salida.
 enum EtapaGuia {
   intro,
   tarjeta,
   verificaciones,
-  fotoFrontal,
-  fotoGesto,
-  fotoConstancia,
+  // [DESACTIVADO 25/10] Las fotos ya no son pantallas aparte: la camara
+  // pasa sola de una foto a otra, como en el Home (ver _etapaCamara).
+  // fotoFrontal,
+  // fotoGesto,
+  // fotoConstancia,
   salida,
   consejos,
   fin,
@@ -60,16 +70,53 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   EstadoVerificacion _estadoHuella = EstadoVerificacion.pendiente;
   EstadoVerificacion _estadoPermisos = EstadoVerificacion.pendiente;
   EstadoVerificacion _estadoGps = EstadoVerificacion.pendiente;
-  String _detalleHuella = 'Se pedirá tu huella o el bloqueo del teléfono.';
-  String _detallePermisos = 'Se pedirá permiso de cámara y de ubicación.';
-  String _detalleGps = 'Se comprobará que el GPS esté encendido.';
+  String _detalleHuella = 'Huella o bloqueo del teléfono.';
+  String _detallePermisos = 'Cámara y ubicación.';
+  String _detalleGps = 'Debe estar encendido.';
 
   // Camara real de practica (no se toman ni se envian fotos)
+  // Si hay controlador, la camara esta abierta en pantalla
   CameraController? _cameraController;
-  bool _mostrarCamara = false;
   bool _abriendoCamara = false;
   String _gestoDemo = generarGestoAleatorio();
-  final Set<EtapaGuia> _fotosPracticadas = {};
+  // [DESACTIVADO 25/10] final Set<EtapaGuia> _fotosPracticadas = {};
+  // Foto en curso, mismos valores que el Home: 'frontal', 'gesto', 'constancia'
+  String _etapaCamara = 'frontal';
+
+  // true mientras se repite huella, GPS y fotos para la salida
+  bool _modoSalida = false;
+
+  // Voz: lee cada paso al aparecer. Se puede silenciar y se recuerda.
+  final FlutterTts _flutterTts = FlutterTts();
+  bool _vozActiva = true;
+  static const String _vozActivaKey = 'guia_voz_activa';
+  // Texto que se lee para cada recuadro del tutorial (por id)
+  final Map<String, String> _vozTargets = {};
+  // Turno de la voz: cambia cada vez que se habla o se corta la voz, asi
+  // una lectura interrumpida no hace avanzar el tutorial
+  int _vozId = 0;
+
+  // Tutorial en pantalla (para avanzarlo solo al terminar la voz)
+  TutorialCoachMark? _tutorial;
+  String? _targetActual;
+
+  // Dedo de la tarjeta despues de su tutorial:
+  // 0 = otro / oculto, 1 = "Aula de ejemplo", 2 = "Marcar Entrada"
+  int _pasoMano = 0;
+  Offset? _posMano;
+  Timer? _timerMano;
+  final GlobalKey _keyStackTarjeta = GlobalKey();
+
+  // Dedo reutilizable: que boton senala, dentro de que zona (Stack) se
+  // dibuja, que texto muestra y en que parte del ancho del boton apunta
+  GlobalKey? _manoObjetivo;
+  GlobalKey? _manoStack;
+  String _manoTexto = '';
+  double _manoFx = 0.5;
+  // [DESACTIVADO 25/10] Sin pantallas de foto ya no hay boton "Abrir camara"
+  // final GlobalKey _keyStackFoto = GlobalKey();
+  // final GlobalKey _keyBotonCamara = GlobalKey();
+  final GlobalKey _keyStackSalida = GlobalKey();
 
   // Claves para resaltar las partes de la tarjeta en el tutorial
   final GlobalKey _keyEncabezado = GlobalKey();
@@ -87,6 +134,18 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   static const Color _successColor = Color(0xFF10B981);
   static const Color _dangerColor = Color(0xFFEF4444);
 
+  // [ANTERIOR] int get _numeroPaso => _etapa.index + 1;
+  // [ANTERIOR] int get _totalPasos => EtapaGuia.values.length;
+  // [DESACTIVADO 25/10] Contaba la verificacion de la salida como un paso
+  // mas; la salida ya no repite la verificacion.
+  // int get _numeroPaso {
+  //   if (_modoSalida && _etapa == EtapaGuia.verificaciones) {
+  //     return EtapaGuia.salida.index + 2;
+  //   }
+  //   if (_etapa.index > EtapaGuia.salida.index) return _etapa.index + 2;
+  //   return _etapa.index + 1;
+  // }
+  // int get _totalPasos => EtapaGuia.values.length + 1;
   int get _numeroPaso => _etapa.index + 1;
   int get _totalPasos => EtapaGuia.values.length;
   bool get _esPrimera => _etapa == EtapaGuia.values.first;
@@ -97,13 +156,104 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _prepararClaseDemo();
+    _iniciarVoz();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _cameraController?.dispose();
+    _timerMano?.cancel();
+    _detenerVoz();
     super.dispose();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Voz
+  // ─────────────────────────────────────────────────────────────
+  // Misma configuracion que la guia anterior
+  Future<void> _iniciarVoz() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _vozActiva = prefs.getBool(_vozActivaKey) ?? true;
+      await _flutterTts.setLanguage('es-MX');
+      await _flutterTts.setSpeechRate(0.38);
+      await _flutterTts.setPitch(1.0);
+      // speak() espera a que termine de hablar (para el avance automatico)
+      await _flutterTts.awaitSpeakCompletion(true);
+    } catch (_) {
+      // Si el telefono no tiene voz en espanol, la guia sigue sin voz
+    }
+    if (!mounted) return;
+    setState(() {});
+    _hablar(_textoVozEtapa(_etapa));
+  }
+
+  // Corta lo que se este leyendo y lee el nuevo texto.
+  // Devuelve true solo si termino de leerlo sin que lo interrumpieran.
+  Future<bool> _hablar(String texto) async {
+    if (!_vozActiva) return false;
+    final turno = ++_vozId;
+    try {
+      await _flutterTts.stop();
+      if (texto.isEmpty) return false;
+      await _flutterTts.speak(texto);
+    } catch (_) {
+      return false;
+    }
+    return mounted && _vozActiva && turno == _vozId;
+  }
+
+  void _detenerVoz() {
+    _vozId++;
+    _flutterTts.stop();
+  }
+
+  Future<void> _alternarVoz() async {
+    setState(() => _vozActiva = !_vozActiva);
+    if (_vozActiva) {
+      _hablar(_textoVozEtapa(_etapa));
+    } else {
+      _detenerVoz();
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_vozActivaKey, _vozActiva);
+    } catch (_) {}
+  }
+
+  String _textoVozEtapa(EtapaGuia etapa) {
+    switch (etapa) {
+      case EtapaGuia.intro:
+        return 'Bienvenido a la guia de uso, puedes practicar el marcado de entrada y salida paso a paso.';
+      // En tarjeta y salida lee el tutorial, que aparece enseguida
+      case EtapaGuia.tarjeta:
+        return '';
+      case EtapaGuia.verificaciones:
+        return 'Verificando huella, permisos y GPS. Luego se abre la cámara.';
+      // [DESACTIVADO 25/10] Las fotos se explican en la propia camara
+      // case EtapaGuia.fotoFrontal: ...
+      // case EtapaGuia.fotoGesto: ...
+      // case EtapaGuia.fotoConstancia: ...
+      case EtapaGuia.salida:
+        return '';
+      case EtapaGuia.consejos:
+        return 'Avisos comunes. Toca uno para ver qué hacer.';
+      case EtapaGuia.fin:
+        return '¡Listo! Ya sabes marcar entrada y salida.';
+    }
+  }
+
+  // Lo que se lee al abrir la camara
+  String _textoVozCamara() {
+    switch (_etapaCamara) {
+      case 'gesto':
+        return 'Foto 2: ${instruccionGesto(_gestoDemo)}, y captura.';
+      case 'constancia':
+        return 'Foto 3: apunta al aula y captura.';
+      default:
+        return 'Foto 1: centra tu rostro, sin lentes, y captura.';
+    }
   }
 
   // Igual que el Home: si la app pasa a segundo plano se libera la camara
@@ -117,23 +267,18 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   // ─────────────────────────────────────────────────────────────
   // Mismas etapas que el marcado real: 'frontal' y 'gesto' con la camara
   // delantera, 'constancia' con la trasera.
-  String get _etapaCamara {
-    switch (_etapa) {
-      case EtapaGuia.fotoGesto:
-        return 'gesto';
-      case EtapaGuia.fotoConstancia:
-        return 'constancia';
-      default:
-        return 'frontal';
-    }
-  }
+  // [ANTERIOR] String get _etapaCamara { switch (_etapa) { ... } }
+  // Ahora _etapaCamara es un campo que avanza al capturar (_fotoPracticada)
 
   Future<void> _abrirCamara() async {
-    if (_abriendoCamara) return;
+    // [ANTERIOR] if (_abriendoCamara) return;
+    // Tambien si ya esta abierta (la camara ahora se abre sola)
+    if (_abriendoCamara || _cameraController != null) return;
     setState(() => _abriendoCamara = true);
 
     // Al empezar la secuencia se elige un gesto nuevo, como en el Home
-    if (_etapa == EtapaGuia.fotoFrontal) _gestoDemo = generarGestoAleatorio();
+    // [ANTERIOR] if (_etapa == EtapaGuia.fotoFrontal) _gestoDemo = generarGestoAleatorio();
+    if (_etapaCamara == 'frontal') _gestoDemo = generarGestoAleatorio();
 
     try {
       final permiso = await Permission.camera.request();
@@ -164,10 +309,8 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
         await controller.dispose();
         return;
       }
-      setState(() {
-        _cameraController = controller;
-        _mostrarCamara = true;
-      });
+      setState(() => _cameraController = controller);
+      _hablar(_textoVozCamara());
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -186,46 +329,265 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   void _cerrarCamara() {
     final controller = _cameraController;
     if (controller == null) return;
-    setState(() {
-      _mostrarCamara = false;
-      _cameraController = null;
-    });
+    setState(() => _cameraController = null);
     WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
   }
 
-  // Boton de captura: en la practica no se toma ni se guarda la foto,
-  // solo se avanza a la siguiente etapa
+  // Boton de captura: en la practica no se toma ni se guarda la foto.
+  // Igual que _capturarYMarcar del Home: frontal -> gesto -> constancia,
+  // abriendo la camara siguiente sola.
+  // [ANTERIOR] Cerraba la camara y pasaba a otra pantalla con "Abrir camara"
   void _fotoPracticada() {
-    final etapaActual = _etapa;
-    _cerrarCamara();
-    _fotosPracticadas.add(etapaActual);
+    if (_etapaCamara == 'frontal') {
+      _siguienteFoto('gesto', 'Ahora: ${instruccionGesto(_gestoDemo)}');
+      return;
+    }
+    if (_etapaCamara == 'gesto') {
+      _siguienteFoto('constancia', 'Ahora la foto del aula');
+      return;
+    }
 
-    final mensajes = {
-      EtapaGuia.fotoFrontal: '¡Foto frontal practicada! Ahora el gesto.',
-      EtapaGuia.fotoGesto: '¡Gesto practicado! Ahora la foto del aula.',
-      EtapaGuia.fotoConstancia: '¡Las 3 fotos practicadas!',
-    };
+    // Tercera foto: termina el marcado de practica
+    _cerrarCamara();
+    _etapaCamara = 'frontal';
+    // [ANTERIOR] SnackBar "¡Entrada/Salida practicada!" y pasaba de etapa
+    _mostrarMarcadoExitoso();
+  }
+
+  // Aviso de exito, con el mismo texto que el Home al marcar
+  // ('Entrada marcada correctamente'). Al continuar sigue la guia:
+  // entrada -> tarjeta de salida, salida -> avisos comunes.
+  Future<void> _mostrarMarcadoExitoso() async {
+    final esSalida = _modoSalida;
+    final titulo =
+        esSalida ? 'Si se cumple todo lo solicitado, aparece un mensaje de que la salida fue marcada con éxito.' : '¡Si se cumple todo lo solicitado, aparece un mensaje de que la entrada fue marcada con éxito.';
+    // En la salida no se repite el proceso en la guia: solo se explica
+    const procesoSalida =
+        'Para la salida se sigue el mismo proceso de la entrada: huella, '
+        'GPS y las 3 fotos.';
+    // [ANTERIOR] _hablar(titulo);
+    // [ANTERIOR] _hablar(esSalida ? '$procesoSalida $titulo' : titulo);
+    // [ANTERIOR] Un solo dialogo con la explicacion encima del exito.
+    // [25/10] Salida: primero una tarjeta flotante con el proceso y
+    // despues la de exito, las dos con el mismo estilo.
+    if (esSalida) {
+      // [ANTERIOR] _hablar(procesoSalida); y la tarjeta tenia "Continuar".
+      // [25/10] Sin boton: se cierra sola al terminar la frase y aparece
+      // la de exito.
+      BuildContext? ctxProceso;
+      var procesoAbierta = true;
+      final procesoCerrada = _mostrarTarjetaFlotante(
+        conBoton: false,
+        alConstruir: (ctx) => ctxProceso = ctx,
+        cabecera: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.fingerprint_rounded, size: 40, color: _primaryColor),
+            SizedBox(width: 12),
+            Icon(Icons.location_on_rounded, size: 40, color: _primaryColor),
+            SizedBox(width: 12),
+            Icon(Icons.photo_camera_rounded, size: 40, color: _primaryColor),
+          ],
+        ),
+        titulo: 'Mismo proceso',
+        texto: procesoSalida,
+        color: _primaryColor,
+      ).whenComplete(() => procesoAbierta = false);
+
+      // Esperar a que termine la frase. Con la voz silenciada (o si falla)
+      // se deja la tarjeta unos segundos para leerla.
+      final inicio = DateTime.now();
+      final leida = await _hablar(procesoSalida);
+      if (!leida) {
+        final restante =
+            const Duration(seconds: 4) - DateTime.now().difference(inicio);
+        if (!restante.isNegative) await Future.delayed(restante);
+      }
+      if (!mounted) return;
+      final ctxTarjeta = ctxProceso;
+      if (procesoAbierta && ctxTarjeta != null && ctxTarjeta.mounted) {
+        Navigator.pop(ctxTarjeta);
+      }
+      await procesoCerrada;
+      if (!mounted) return;
+    }
+
+    _hablar(titulo);
+    await _mostrarTarjetaFlotante(
+      cabecera: const Icon(Icons.check_circle_rounded,
+          size: 64, color: _successColor),
+      titulo: titulo,
+      texto: 'Práctica: no se envió nada.',
+      color: _successColor,
+      textoSecundario: true,
+    );
+
+    if (!mounted) return;
+    _irAEtapa(esSalida ? EtapaGuia.consejos : EtapaGuia.salida);
+  }
+
+  // Tarjeta flotante (dialogo) con icono, titulo, texto y "Continuar".
+  // Sin boton (conBoton: false) no se cierra con "atras": la cierra quien
+  // la abrio, usando el contexto que recibe alConstruir.
+  Future<void> _mostrarTarjetaFlotante({
+    required Widget cabecera,
+    required String titulo,
+    required String texto,
+    required Color color,
+    bool textoSecundario = false,
+    bool conBoton = true,
+    void Function(BuildContext ctx)? alConstruir,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        alConstruir?.call(ctx);
+        return PopScope(
+          canPop: conBoton,
+          child: _buildTarjetaFlotante(
+            ctx,
+            cabecera: cabecera,
+            titulo: titulo,
+            texto: texto,
+            color: color,
+            textoSecundario: textoSecundario,
+            conBoton: conBoton,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTarjetaFlotante(
+    BuildContext ctx, {
+    required Widget cabecera,
+    required String titulo,
+    required String texto,
+    required Color color,
+    required bool textoSecundario,
+    required bool conBoton,
+  }) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          cabecera,
+          const SizedBox(height: 12),
+          Text(
+            titulo,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: _darkColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            texto,
+            textAlign: TextAlign.center,
+            style: textoSecundario
+                ? TextStyle(fontSize: 12.5, color: Colors.grey.shade600)
+                : const TextStyle(fontSize: 14, color: _darkColor, height: 1.4),
+          ),
+        ],
+      ),
+      actions: [
+        if (conBoton)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Continuar'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // Como _switchToNextStage del Home: cierra la camara, avisa y abre la
+  // siguiente
+  Future<void> _siguienteFoto(String etapaCamara, String mensaje) async {
+    _cerrarCamara();
+    _etapaCamara = etapaCamara;
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(mensajes[etapaActual] ?? '¡Foto practicada!'),
-      backgroundColor: _successColor,
+      content: Text(mensaje),
       duration: const Duration(seconds: 2),
     ));
-    _siguiente();
+    await _abrirCamara();
+  }
+
+  // Boton X de la camara: se cancela el marcado y se vuelve a la tarjeta
+  void _cancelarCamara() {
+    _cerrarCamara();
+    _etapaCamara = 'frontal';
+    _irAEtapa(_modoSalida ? EtapaGuia.salida : EtapaGuia.tarjeta);
+  }
+
+  // Al terminar la verificacion se abre la camara sola, como en el Home
+  Future<void> _abrirCamaraTrasVerificar() async {
+    // Breve pausa para que se vean las verificaciones en verde
+    await Future.delayed(const Duration(milliseconds: 1200));
+    if (!mounted || _etapa != EtapaGuia.verificaciones) return;
+    _etapaCamara = 'frontal';
+    await _abrirCamara();
   }
 
   void _siguiente() {
     if (_esUltima) return;
-    _irAEtapa(EtapaGuia.values[_etapa.index + 1]);
+    // [ANTERIOR] _irAEtapa(EtapaGuia.values[_etapa.index + 1]);
+    switch (_etapa) {
+      // Sin marcar: se salta la practica de entrada o de salida
+      case EtapaGuia.tarjeta:
+        _irAEtapa(EtapaGuia.salida);
+      case EtapaGuia.salida:
+        _irAEtapa(EtapaGuia.consejos);
+      // Si la camara se cerro (ej. la app paso a segundo plano), reabrirla
+      case EtapaGuia.verificaciones:
+        _etapaCamara = 'frontal';
+        _abrirCamara();
+      default:
+        _irAEtapa(EtapaGuia.values[_etapa.index + 1]);
+    }
   }
 
   void _anterior() {
     if (_esPrimera) return;
-    _irAEtapa(EtapaGuia.values[_etapa.index - 1]);
+    // [ANTERIOR] _irAEtapa(EtapaGuia.values[_etapa.index - 1]);
+    switch (_etapa) {
+      case EtapaGuia.verificaciones:
+        _irAEtapa(_modoSalida ? EtapaGuia.salida : EtapaGuia.tarjeta);
+      case EtapaGuia.salida:
+        _irAEtapa(EtapaGuia.tarjeta);
+      default:
+        _irAEtapa(EtapaGuia.values[_etapa.index - 1]);
+    }
   }
 
   void _irAEtapa(EtapaGuia etapa) {
-    setState(() => _etapa = etapa);
+    _ocultarMano();
+    setState(() {
+      _etapa = etapa;
+      // Volver a la tarjeta o a la salida reinicia esa practica
+      if (etapa == EtapaGuia.tarjeta) _modoSalida = false;
+      if (etapa == EtapaGuia.salida) _modoSalida = false;
+    });
+    // La voz habla al aparecer cada paso (corta la del paso anterior)
+    _hablar(_textoVozEtapa(etapa));
     if (etapa == EtapaGuia.tarjeta) _mostrarTutorialTarjeta();
+    // [DESACTIVADO 25/10] Dedo sobre "Abrir camara" en cada foto: ya no hay
+    // pantallas de foto, la camara se abre sola
     if (etapa == EtapaGuia.salida) {
       _prepararSalidaDemo();
       _mostrarTutorialSalida();
@@ -276,9 +638,9 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       _estadoHuella = EstadoVerificacion.enCurso;
       _estadoPermisos = EstadoVerificacion.pendiente;
       _estadoGps = EstadoVerificacion.pendiente;
-      _detalleHuella = 'Coloca tu dedo en el lector o usa el bloqueo del teléfono.';
-      _detallePermisos = 'Se pedirá permiso de cámara y de ubicación.';
-      _detalleGps = 'Se comprobará que el GPS esté encendido.';
+      _detalleHuella = 'Pon tu dedo en el lector.';
+      _detallePermisos = 'Cámara y ubicación.';
+      _detalleGps = 'Debe estar encendido.';
     });
 
     // 1. Huella
@@ -289,8 +651,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
           huellaOk ? EstadoVerificacion.ok : EstadoVerificacion.fallo;
       _detalleHuella = huellaOk
           ? 'Identidad confirmada.'
-          : 'No se pudo verificar. En la app real te preguntará si deseas '
-              'continuar sin huella.';
+          : 'No se verificó. La app te dejará continuar sin huella.';
       _estadoPermisos = EstadoVerificacion.enCurso;
     });
 
@@ -303,13 +664,12 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       if (!ubicacion.isGranted) 'ubicación',
     ];
     setState(() {
-      _estadoPermisos = faltantes.isEmpty
-          ? EstadoVerificacion.ok
-          : EstadoVerificacion.fallo;
+      _estadoPermisos =
+          faltantes.isEmpty ? EstadoVerificacion.ok : EstadoVerificacion.fallo;
       _detallePermisos = faltantes.isEmpty
           ? 'Permisos concedidos.'
-          : 'Falta el permiso de ${faltantes.join(' y ')}. En la app real no '
-              'podrás marcar sin él; actívalo en Ajustes > Aplicaciones.';
+          : 'Falta permiso de ${faltantes.join(' y ')}. Actívalo en '
+              'Ajustes > Aplicaciones.';
       _estadoGps = EstadoVerificacion.enCurso;
     });
 
@@ -317,6 +677,13 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     await _verificarGps();
     if (!mounted) return;
     setState(() => _verificando = false);
+
+    // 4. Como en el Home: con permisos y GPS listos se abre la camara.
+    // Si algo fallo, el docente lo ve y puede reintentar.
+    if (_estadoPermisos == EstadoVerificacion.ok &&
+        _estadoGps == EstadoVerificacion.ok) {
+      _abrirCamaraTrasVerificar();
+    }
   }
 
   Future<void> _verificarGps() async {
@@ -324,8 +691,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       if (!mounted) return;
       setState(() {
         _estadoGps = EstadoVerificacion.fallo;
-        _detalleGps = 'El GPS está apagado. En la app real se abrirán los '
-            'ajustes para que lo actives; sin GPS no se puede marcar.';
+        _detalleGps = 'GPS apagado. Actívalo: sin GPS no se puede marcar.';
       });
       return;
     }
@@ -338,22 +704,16 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       if (!mounted) return;
       setState(() {
         _estadoGps = EstadoVerificacion.ok;
-        _detalleGps = 'Ubicación obtenida (precisión ±'
-            '${posicion.accuracy.toStringAsFixed(0)} m). En la app real se '
-            'envía con las fotos para verificar que estés en el aula.';
+        _detalleGps = 'Ubicación obtenida (±'
+            '${posicion.accuracy.toStringAsFixed(0)} m).';
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _estadoGps = EstadoVerificacion.fallo;
-        _detalleGps = 'No se pudo obtener tu ubicación. Acércate a una '
-            'ventana o sal al exterior e inténtalo de nuevo.';
+        _detalleGps = 'Sin ubicación. Acércate a una ventana y reintenta.';
       });
     }
-  }
-
-  Future<void> _activarGps() async {
-    await Geolocator.openLocationSettings();
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -374,43 +734,55 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     if (fin.isAfter(finDia)) fin = finDia;
 
     final formato = DateFormat('HH:mm');
-    final base = _horarioDemo ??
-        Horario(
-          id: 0,
-          diaSemana: '',
-          horaInicio: '',
-          horaFin: '',
-          materia: 'Clase de ejemplo',
-          paralelo: 'A',
-          ubicacion: 'Aula de ejemplo',
-          paraleloMateriaId: 0,
-          ubicacionId: 0,
-          yaMarcoEntrada: false,
-          yaMarcoSalida: false,
-          ubicacionNombre: 'Aula de ejemplo',
-        );
-
     setState(() {
-      _horarioSalidaDemo = base.copyWith(
+      // Misma zona que la tarjeta de entrada (si ya se consiguio)
+      _horarioSalidaDemo = _crearHorarioDemo(
         horaInicio: formato.format(inicio),
         horaFin: formato.format(fin),
         yaMarcoEntrada: true,
-        yaMarcoSalida: false,
+        poligono: _horarioDemo?.poligono,
       );
     });
   }
 
-  // El docente confirmo el dialogo real de salida
+  // Clase de ejemplo con los datos que se muestran en la tarjeta real
+  Horario _crearHorarioDemo({
+    required String horaInicio,
+    required String horaFin,
+    bool yaMarcoEntrada = false,
+    List<Map<String, double>>? poligono,
+  }) {
+    return Horario(
+      id: 0,
+      diaSemana: '',
+      horaInicio: horaInicio,
+      horaFin: horaFin,
+      materia: 'Clase de ejemplo',
+      paralelo: 'A',
+      ubicacion: 'Aula de ejemplo',
+      paraleloMateriaId: 0,
+      ubicacionId: 0,
+      yaMarcoEntrada: yaMarcoEntrada,
+      yaMarcoSalida: false,
+      ubicacionNombre: 'Aula de ejemplo',
+      poligono: poligono,
+    );
+  }
+
+  // El docente confirmo el dialogo real de salida: igual que el Home
+  // (_iniciarMarcado('salida')), se repiten huella, GPS y las 3 fotos
+  // [ANTERIOR] Mostraba un aviso "en la app real se repiten..." y pasaba
+  // a los consejos sin practicarlo
+  // [DESACTIVADO 25/10] Repetir huella, GPS y fotos alargaba la guia:
+  // ahora solo se explica que el proceso es el mismo que en la entrada.
+  // void _salidaPracticada() {
+  //   _irAEtapa(EtapaGuia.verificaciones);
+  //   setState(() => _modoSalida = true);
+  //   _iniciarVerificaciones();
+  // }
   void _salidaPracticada() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text(
-        '¡Salida confirmada! En la app real ahora se repiten la huella, '
-        'el GPS y las 3 fotos, igual que en la entrada.',
-      ),
-      backgroundColor: _successColor,
-      duration: Duration(seconds: 4),
-    ));
-    _siguiente();
+    setState(() => _modoSalida = true);
+    _mostrarMarcadoExitoso();
   }
 
   // Boton "Reintentar ubicacion"
@@ -442,19 +814,9 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     setState(() {
       _buscandoUbicacion = false;
       _demoConUbicacion = posicion != null;
-      _horarioDemo = Horario(
-        id: 0,
-        diaSemana: '',
+      _horarioDemo = _crearHorarioDemo(
         horaInicio: _horaInicioDemo,
         horaFin: _horaFinDemo,
-        materia: 'Clase de ejemplo',
-        paralelo: 'A',
-        ubicacion: 'Aula de ejemplo',
-        paraleloMateriaId: 0,
-        ubicacionId: 0,
-        yaMarcoEntrada: false,
-        yaMarcoSalida: false,
-        ubicacionNombre: 'Aula de ejemplo',
         poligono: poligono,
       );
     });
@@ -504,53 +866,33 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
           'encabezado',
           _keyEncabezado,
           ContentAlign.bottom,
-          'Encabezado de la clase',
-          'Muestra la materia, el paralelo y el horario. El color indica el '
-              'estado: azul pendiente, naranja en curso y verde completado.',
+          'Tu clase',
+          'Materia, paralelo y horario. El color azul significa marcado pendiente.',
         ),
         _crearTarget(
           'ubicacion',
           _keyUbicacion,
           ContentAlign.bottom,
-          'Ubicación del aula',
+          'Aula',
           _demoConUbicacion
-              ? 'Toca aquí para ver el mapa con la zona de tu clase. Tu '
-                  'ubicación GPS se envía con el marcado para verificar que '
-                  'estés en el aula.'
-              : 'Aquí aparece el aula. Con el GPS activado, al tocarla verás '
-                  'el mapa con la zona de tu clase.',
+              ? 'Tócala para ver en el mapa la zona donde debes marcar.'
+              : 'Con el GPS activo, tócala para ver el mapa.',
         ),
         _crearTarget(
           'estado',
           _keyEstado,
           ContentAlign.bottom,
           'Temporizador',
-          'Indica cuánto falta para que empiece la clase o cuánto retraso '
-              'llevas. Puedes marcar la entrada desde 30 minutos antes del '
-              'inicio.',
+          'Cuánto falta para empezar. La entrada se marca desde 30 min antes.',
         ),
         _crearTarget(
           'botones',
           _keyBotones,
           ContentAlign.top,
-          'Botón azul: Marcar Entrada',
-          'Cuando llegues a tu clase, tócalo. Primero te pedirá tu huella y '
-              'el GPS, y luego abrirá la cámara. ¡Pruébalo ahora!',
+          'Boton: Marcar Entrada',
+          'Tócalo al llegar al aula para registrar su entrada.,',
         ),
       ];
-
-      // [ANTERIOR] Se movio a _mostrarTargets() para reutilizarlo en la salida
-      // ].where((t) => t.keyTarget?.currentContext != null).toList();
-      //
-      // if (targets.isEmpty) return;
-      //
-      // TutorialCoachMark(
-      //   targets: targets,
-      //   colorShadow: Colors.black87,
-      //   opacityShadow: 0.8,
-      //   paddingFocus: 8,
-      //   textSkip: 'SALTAR',
-      // ).show(context: context);
       _mostrarTargets(targets);
     });
   }
@@ -567,24 +909,21 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
           _keyEncabezado,
           ContentAlign.bottom,
           'Clase en curso',
-          'Después de marcar la entrada, la tarjeta se pone naranja y '
-              'muestra "En curso".',
+          'Con la entrada marcada, la tarjeta se pone de color naranja, lo cual significa actividades en curso.',
         ),
         _crearTarget(
           'temporizador_salida',
           _keySalida,
           ContentAlign.bottom,
           'Temporizador de salida',
-          'Te indica cuánto falta para que termine la clase.',
+          'Cuánto falta para terminar la clase.',
         ),
         _crearTarget(
           'boton_salida',
           _keyBotones,
           ContentAlign.top,
-          'Botón rojo: Marcar Salida',
-          'Solo se habilita desde 30 minutos antes hasta 30 minutos después '
-              'del fin de la clase. Al tocarlo te pedirá confirmar. '
-              '¡Pruébalo ahora!',
+          'Marcar Salida',
+          'Se habilita 30 min antes del fin. ¡Pruébalo!',
         ),
       ]);
     });
@@ -596,13 +935,171 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
         targets.where((t) => t.keyTarget?.currentContext != null).toList();
     if (visibles.isEmpty) return;
 
-    TutorialCoachMark(
+    _tutorial = TutorialCoachMark(
       targets: visibles,
       colorShadow: Colors.black87,
       opacityShadow: 0.8,
       paddingFocus: 8,
       textSkip: 'SALTAR',
-    ).show(context: context);
+      // Lee cada recuadro al mostrarse y avanza solo al terminar.
+      // No se espera aqui: el tutorial no muestra el recuadro hasta que
+      // beforeFocus termina.
+      beforeFocus: (target) {
+        _targetActual = target.identify;
+        _leerYAvanzar(target.identify);
+      },
+      onFinish: _alTerminarTutorial,
+      onSkip: () {
+        _alTerminarTutorial();
+        return true;
+      },
+    )..show(context: context);
+  }
+
+  Future<void> _leerYAvanzar(String id) async {
+    final termino = await _hablar(_vozTargets[id] ?? '');
+    if (!termino) return; // silenciado o interrumpido: avanza al tocar
+    await Future.delayed(const Duration(milliseconds: 600));
+    // Seguir solo si nadie avanzo el tutorial mientras tanto
+    if (mounted && _tutorial != null && _targetActual == id) {
+      _tutorial!.next();
+    }
+  }
+
+  void _alTerminarTutorial() {
+    _tutorial = null;
+    _targetActual = null;
+    _detenerVoz();
+    if (!mounted) return;
+    // [ANTERIOR] if (_etapa == EtapaGuia.tarjeta) _mostrarMano(1);
+    // [25/10] Sin el dedo sobre el mapa: va directo a "Marcar Entrada"
+    if (_etapa == EtapaGuia.tarjeta) _mostrarMano(2);
+    if (_etapa == EtapaGuia.salida) {
+      _mostrarManoEn(
+        objetivo: _keyBotones,
+        stack: _keyStackSalida,
+        texto: 'Toca Marcar Salida',
+        voz: 'Ahora toca el botón rojo, Marcar Salida.',
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Dedo indicador
+  // ─────────────────────────────────────────────────────────────
+  // _mostrarManoEn() sirve para cualquier boton: la tarjeta, las camaras
+  // y la salida. El dedo se dibuja dentro de la zona creada con _conMano().
+
+  // Tarjeta: 1 = "Aula de ejemplo", 2 = "Marcar Entrada"
+  void _mostrarMano(int paso) {
+    _pasoMano = paso;
+    _mostrarManoEn(
+      objetivo: paso == 1 ? _keyUbicacion : _keyBotones,
+      stack: _keyStackTarjeta,
+      texto: paso == 1
+          ? 'Toca aquí para ver el mapa'
+          : 'Ahora toca Marcar Entrada',
+      voz: paso == 1
+          ? 'Toca Aula de ejemplo para ver el mapa de tu clase.'
+          // [ANTERIOR] : 'Muy bien. Ahora toca el botón azul, Marcar Entrada.',
+          : 'Ahora toca el botón azul, Marcar Entrada.',
+      // "Aula de ejemplo" esta a la derecha de su fila
+      fx: paso == 1 ? 0.62 : 0.5,
+    );
+  }
+
+  void _mostrarManoEn({
+    required GlobalKey objetivo,
+    required GlobalKey stack,
+    required String texto,
+    String? voz,
+    double fx = 0.5,
+  }) {
+    setState(() {
+      _manoObjetivo = objetivo;
+      _manoStack = stack;
+      _manoTexto = texto;
+      _manoFx = fx;
+      _posMano = null;
+    });
+    if (voz != null) _hablar(voz);
+
+    // El contenido cambia de tamano (mapa, temporizador): reubicar el dedo
+    _timerMano?.cancel();
+    _timerMano = Timer.periodic(
+      const Duration(milliseconds: 400),
+      (_) => _actualizarPosicionMano(),
+    );
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _actualizarPosicionMano());
+  }
+
+  void _ocultarMano() {
+    _timerMano?.cancel();
+    _timerMano = null;
+    _pasoMano = 0;
+    _manoObjetivo = null;
+    _manoStack = null;
+    _posMano = null;
+  }
+
+  // Posicion de la punta del dedo, relativa a su zona (Stack)
+  void _actualizarPosicionMano() {
+    final objetivo = _manoObjetivo;
+    final stack = _manoStack;
+    if (!mounted || objetivo == null || stack == null) return;
+    final rect = _rectRelativo(objetivo, stack);
+    if (rect == null) return;
+
+    final punta = Offset(rect.left + rect.width * _manoFx, rect.center.dy);
+    if (punta != _posMano) setState(() => _posMano = punta);
+  }
+
+  Rect? _rectRelativo(GlobalKey key, GlobalKey stackKey) {
+    final stack = stackKey.currentContext?.findRenderObject() as RenderBox?;
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (stack == null || box == null || !box.attached || !stack.attached) {
+      return null;
+    }
+    final origen = box.localToGlobal(Offset.zero, ancestor: stack);
+    return origen & box.size;
+  }
+
+  // Envuelve un contenido en una zona donde se puede dibujar el dedo.
+  // Deja espacio abajo para la etiqueta cuando el dedo esta visible.
+  Widget _conMano(GlobalKey stackKey, Widget child) {
+    final visible = _manoStack == stackKey && _posMano != null;
+    return Padding(
+      padding: EdgeInsets.only(bottom: visible ? 90 : 0),
+      child: Stack(
+        key: stackKey,
+        clipBehavior: Clip.none,
+        children: [
+          child,
+          if (visible)
+            Positioned(
+              // La punta del dedo (arriba al centro del widget) toca el objetivo
+              left: _posMano!.dx - 60,
+              top: _posMano!.dy - 8,
+              child: IgnorePointer(child: _ManoIndicadora(texto: _manoTexto)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Detecta el toque sobre "Aula de ejemplo" sin bloquear la tarjeta
+  void _alSoltarToqueTarjeta(PointerUpEvent evento) {
+    if (_pasoMano != 1) return;
+    final box = _keyUbicacion.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return;
+    final rect = box.localToGlobal(Offset.zero) & box.size;
+    if (!rect.contains(evento.position)) return;
+
+    // Esperar a que el mapa se abra antes de mover el dedo al boton
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted && _pasoMano == 1) _mostrarMano(2);
+    });
   }
 
   TargetFocus _crearTarget(
@@ -612,6 +1109,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     String titulo,
     String descripcion,
   ) {
+    _vozTargets[id] = '$titulo. $descripcion';
     return TargetFocus(
       identify: id,
       keyTarget: key,
@@ -663,15 +1161,10 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   // - Abierta desde el Home o Perfil (push): vuelve a esa pantalla.
   // - Primer ingreso (pushReplacement, sin pantalla anterior): va al Home.
   Future<void> _finalizar() async {
+    _detenerVoz();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('ya_vio_tutorial', true);
     if (!mounted) return;
-    // [ANTERIOR] Siempre reiniciaba el Home:
-    // Navigator.pushAndRemoveUntil(
-    //   context,
-    //   MaterialPageRoute(builder: (_) => const HomeScreen()),
-    //   (route) => false,
-    // );
     if (Navigator.canPop(context)) {
       Navigator.pop(context);
     } else {
@@ -686,14 +1179,15 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   @override
   Widget build(BuildContext context) {
     // Igual que el Home: la camara ocupa toda la pantalla
-    if (_mostrarCamara && _cameraController != null) {
+    if (_cameraController != null) {
       return CameraMarcadoScreen(
         cameraController: _cameraController!,
         etapaFoto: _etapaCamara,
         gestoSolicitado: _gestoDemo,
         instruccionGesto: instruccionGesto,
         onCapture: _fotoPracticada,
-        onCancel: _cerrarCamara,
+        // [ANTERIOR] onCancel: _cerrarCamara,
+        onCancel: _cancelarCamara,
       );
     }
 
@@ -713,11 +1207,20 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
         elevation: 0,
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            onPressed: _alternarVoz,
+            tooltip: _vozActiva ? 'Silenciar voz' : 'Activar voz',
+            icon: Icon(
+              _vozActiva ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+              color: Colors.white,
+            ),
+          ),
           TextButton(
             onPressed: _finalizar,
             child: const Text(
               'Saltar',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -725,7 +1228,9 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       body: SafeArea(
         child: Column(
           children: [
-            _buildBanner(),
+            // [DESACTIVADO 25/10] Banner "MODO PRÁCTICA" quitado por
+            // innecesario (la bienvenida ya dice que nada se envia)
+            // _buildBanner(),
             _buildProgreso(),
             Expanded(
               child: ListView(
@@ -743,6 +1248,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   // ─────────────────────────────────────────────────────────────
   //  Banner de modo practica
   // ─────────────────────────────────────────────────────────────
+  /* [DESACTIVADO 25/10] Ya no se muestra (ver build)
   Widget _buildBanner() {
     return Container(
       width: double.infinity,
@@ -767,6 +1273,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       ),
     );
   }
+  [FIN DESACTIVADO] */
 
   // ─────────────────────────────────────────────────────────────
   //  Indicador "Paso X de N"
@@ -802,55 +1309,21 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
 
   // ─────────────────────────────────────────────────────────────
   //  Contenido de cada etapa
-  //  (por ahora un texto que indica en que fase se implementa)
   // ─────────────────────────────────────────────────────────────
   Widget _buildContenidoEtapa() {
     switch (_etapa) {
       case EtapaGuia.intro:
         return _buildTextoEtapa(
           Icons.waving_hand_rounded,
-          'Bienvenido a la guía',
-          'Vas a practicar un marcado completo con una clase de ejemplo, '
-              'usando las mismas pantallas de la app. Nada se envía al servidor.',
+          'Guía de uso',
+          'Conoce la aplicacion y practica el marcado de entrada y salida. ',
         );
       case EtapaGuia.tarjeta:
         return _buildEtapaTarjeta();
       case EtapaGuia.verificaciones:
         return _buildEtapaVerificaciones();
-      case EtapaGuia.fotoFrontal:
-        return _buildEtapaFoto(
-          Icons.face_rounded,
-          'Foto 1 de 3: frontal',
-          'Se usa la cámara delantera.',
-          const [
-            'Centra tu rostro dentro del marco.',
-            'Busca buena iluminación y mira directo a la cámara.',
-            'Quítate los lentes: pueden impedir el reconocimiento.',
-          ],
-        );
-      case EtapaGuia.fotoGesto:
-        return _buildEtapaFoto(
-          Icons.pan_tool_rounded,
-          'Foto 2 de 3: gesto',
-          'Se usa la cámara delantera.',
-          [
-            'Comprueba que eres una persona real y no una foto.',
-            'El gesto cambia en cada marcado. En esta práctica te tocó: '
-                '"${instruccionGesto(_gestoDemo)}".',
-            'La instrucción aparece dentro del marco de la cámara.',
-          ],
-        );
-      case EtapaGuia.fotoConstancia:
-        return _buildEtapaFoto(
-          Icons.photo_camera_rounded,
-          'Foto 3 de 3: constancia del aula',
-          'Se usa la cámara trasera.',
-          const [
-            'Toma una foto del aula donde estás dando la clase.',
-            'Encuadra el entorno completo.',
-            'Si hay poca luz, puedes activar el flash.',
-          ],
-        );
+      // [DESACTIVADO 25/10] Pantallas de cada foto (fotoFrontal, fotoGesto,
+      // fotoConstancia) con _buildEtapaFoto: la camara se abre sola
       case EtapaGuia.salida:
         return _buildEtapaSalida();
       case EtapaGuia.consejos:
@@ -867,8 +1340,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Estos son los avisos más comunes al marcar. Toca cada uno para '
-          'ver por qué aparece y qué hacer.',
+          'Avisos comunes. Toca uno para ver qué hacer.',
           style: TextStyle(fontSize: 14, color: _darkColor, height: 1.4),
         ),
         const SizedBox(height: 12),
@@ -876,45 +1348,41 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
           Icons.visibility_off_rounded,
           _warningColor,
           'Gafas detectadas',
-          'Los lentes pueden impedir que el sistema reconozca tu rostro.',
-          'Quítate los lentes antes de la foto frontal y toca "Reintentar".',
+          'Los lentes impiden reconocer tu rostro.',
+          'Quítatelos y toca "Reintentar".',
         ),
         _buildConsejo(
           Icons.warning_amber_rounded,
           _dangerColor,
           'Suplantación detectada',
-          'El sistema detectó que la foto podría ser de una pantalla, una '
-              'foto impresa o de otra persona. Se informa al supervisor.',
-          'Ponte tú frente a la cámara. Nunca uses fotos ni pantallas.',
+          'La foto parece de una pantalla, impresa o de otra persona. Se '
+              'informa al supervisor.',
+          'Ponte tú frente a la cámara.',
         ),
         _buildConsejo(
           Icons.pan_tool_rounded,
           _warningColor,
           'Gesto incorrecto',
-          'El gesto de la segunda foto no coincide con el que se pidió.',
-          'Lee la instrucción dentro del marco y haz el gesto de forma clara '
-              'antes de tomar la foto.',
+          'El gesto no coincide con el pedido.',
+          'Lee la instrucción del marco y haz el gesto claro.',
         ),
         _buildConsejo(
           Icons.wrong_location_rounded,
           _dangerColor,
           'Fuera de la zona',
-          'Tu ubicación GPS no está dentro de la zona del aula de tu clase.',
-          'Marca solo cuando estés en el aula. Revisa la zona tocando la '
-              'ubicación en la tarjeta para ver el mapa.',
+          'No estás dentro de la zona del aula.',
+          'Marca desde el aula. Toca el aula en la tarjeta para ver el mapa.',
         ),
         _buildConsejo(
           Icons.location_off_rounded,
           _dangerColor,
           'El GPS está desactivado',
-          'Sin GPS la app no puede verificar dónde estás y no permite marcar.',
-          'Activa la ubicación del teléfono. La app te llevará a los ajustes '
-              'para hacerlo.',
+          'Sin GPS no se puede marcar.',
+          'Activa la ubicación; la app te lleva a los ajustes.',
         ),
         const SizedBox(height: 4),
         Text(
-          'En los avisos de error puedes tocar "Reintentar" para repetir el '
-          'marcado completo.',
+          'En cualquier error, "Reintentar" repite el marcado.',
           style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
         ),
       ],
@@ -977,10 +1445,10 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   // Etapa 9: resumen final
   Widget _buildEtapaFin() {
     const pasos = [
-      'Toca el botón azul "Marcar Entrada" en tu clase.',
-      'Confirma tu huella y ten el GPS encendido.',
-      'Toma las 3 fotos: frontal, gesto y constancia del aula.',
-      'Al terminar, marca la salida con el botón rojo y confírmala.',
+      'En el aula, toca "Marcar Entrada".',
+      'Huella y GPS encendido.',
+      'Las 3 fotos: rostro, gesto y aula.',
+      'Al terminar, "Marcar Salida": se repite lo mismo.',
     ];
 
     return Card(
@@ -1071,35 +1539,35 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Así verás cada clase en tu pantalla principal. '
-          'Toca "Marcar Entrada" para continuar.',
+          'Así verás cada clase. Toca "Marcar Entrada".',
           style: TextStyle(fontSize: 14, color: _darkColor, height: 1.4),
         ),
         const SizedBox(height: 12),
-        HorarioCardExtended(
-          // Al conseguir la ubicacion se crea una tarjeta nueva para que
-          // vuelva a calcular la zona y si el docente esta dentro
-          key: ValueKey(_demoConUbicacion),
-          horario: _horarioDemo!,
-          // [ANTERIOR] onMarcarEntrada: () => _irAEtapa(EtapaGuia.verificaciones),
-          // Igual que en el Home: al tocar el boton se piden huella y GPS
-          onMarcarEntrada: () {
-            _irAEtapa(EtapaGuia.verificaciones);
-            _iniciarVerificaciones();
-          },
-          // Fase 5: dialogo real de confirmacion de salida
-          onMarcarSalida: () {},
-          keyEncabezado: _keyEncabezado,
-          keyUbicacion: _keyUbicacion,
-          keyEstado: _keyEstado,
-          keyBotones: _keyBotones,
+        // La tarjeta va dentro de un Stack para dibujar el dedo encima, y
+        // de un Listener para saber si se toco "Aula de ejemplo"
+        Listener(
+          onPointerUp: _alSoltarToqueTarjeta,
+          child: _conMano(
+            _keyStackTarjeta,
+            HorarioCardExtended(
+              // Al conseguir la ubicacion se crea una tarjeta nueva para que
+              // vuelva a calcular la zona y si el docente esta dentro
+              key: ValueKey(_demoConUbicacion),
+              horario: _horarioDemo!,
+              // Igual que en el Home: al tocar el boton se piden huella y GPS
+              onMarcarEntrada: () {
+                _irAEtapa(EtapaGuia.verificaciones);
+                _iniciarVerificaciones();
+              },
+              // Sin entrada marcada no hay boton de salida (etapa 7)
+              onMarcarSalida: () {},
+              keyEncabezado: _keyEncabezado,
+              keyUbicacion: _keyUbicacion,
+              keyEstado: _keyEstado,
+              keyBotones: _keyBotones,
+            ),
+          ),
         ),
-        // [ANTERIOR] Aviso sin opcion de reintentar:
-        // if (!_demoConUbicacion)
-        //   Text(
-        //     'Activa el GPS y vuelve a abrir la guía para ver el mapa de la zona.',
-        //     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        //   ),
         if (!_demoConUbicacion) _buildAvisoSinUbicacion(),
       ],
     );
@@ -1115,22 +1583,24 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Al terminar tu clase marcas la salida desde la misma tarjeta. '
-          'Toca "Marcar Salida" para ver la confirmación.',
+          'Al terminar la clase, toca "Marcar Salida".',
           style: TextStyle(fontSize: 14, color: _darkColor, height: 1.4),
         ),
         const SizedBox(height: 12),
         _buildReglaSalida(),
         const SizedBox(height: 12),
-        HorarioCardExtended(
-          key: const ValueKey('salida'),
-          horario: _horarioSalidaDemo!,
-          onMarcarEntrada: () {},
-          // Se llama solo si el docente confirma el dialogo real de salida
-          onMarcarSalida: _salidaPracticada,
-          keyEncabezado: _keyEncabezado,
-          keyBotones: _keyBotones,
-          keySalida: _keySalida,
+        _conMano(
+          _keyStackSalida,
+          HorarioCardExtended(
+            key: const ValueKey('salida'),
+            horario: _horarioSalidaDemo!,
+            onMarcarEntrada: () {},
+            // Se llama solo si el docente confirma el dialogo real de salida
+            onMarcarSalida: _salidaPracticada,
+            keyEncabezado: _keyEncabezado,
+            keyBotones: _keyBotones,
+            keySalida: _keySalida,
+          ),
         ),
       ],
     );
@@ -1172,8 +1642,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Si sales antes o después de la hora de fin, el diálogo de '
-            'confirmación te indica la diferencia en minutos.',
+            'Si sales antes o después, el aviso te muestra los minutos.',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
           ),
         ],
@@ -1181,8 +1650,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     );
   }
 
-  Widget _buildTramo(String texto, Color color, String estado,
-      {int flex = 1}) {
+  Widget _buildTramo(String texto, Color color, String estado, {int flex = 1}) {
     return Expanded(
       flex: flex,
       child: Padding(
@@ -1219,6 +1687,9 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     );
   }
 
+  /* [DESACTIVADO 25/10] Pantalla de cada foto con boton "Abrir camara".
+     Ya no se usa: la camara se abre sola y pasa de una foto a otra.
+
   // Etapas 4, 5 y 6: explicacion de cada foto y boton para abrir la camara
   Widget _buildEtapaFoto(
     IconData icono,
@@ -1228,113 +1699,118 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
   ) {
     final practicada = _fotosPracticadas.contains(_etapa);
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    // Zona con dedo: senala "Abrir camara" mientras la foto no se practique
+    return _conMano(
+        _keyStackFoto,
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: Colors.grey.shade200),
+          ),
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icono, size: 36, color: _primaryColor),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        titulo,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: _darkColor,
-                        ),
-                      ),
-                      Text(
-                        camara,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (practicada)
-                  const Icon(Icons.check_circle_rounded,
-                      color: _successColor, size: 26),
-              ],
-            ),
-            const SizedBox(height: 14),
-            for (final consejo in consejos)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
                   children: [
-                    const Icon(Icons.lightbulb_outline_rounded,
-                        color: _warningColor, size: 18),
-                    const SizedBox(width: 8),
+                    Icon(icono, size: 36, color: _primaryColor),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        consejo,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          color: Colors.grey.shade800,
-                          height: 1.35,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            titulo,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: _darkColor,
+                            ),
+                          ),
+                          Text(
+                            camara,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    if (practicada)
+                      const Icon(Icons.check_circle_rounded,
+                          color: _successColor, size: 26),
                   ],
                 ),
-              ),
-            const SizedBox(height: 8),
-            Text(
-              'Es solo práctica: la foto no se guarda ni se envía.',
-              style: TextStyle(
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _abriendoCamara ? null : _abrirCamara,
-                icon: _abriendoCamara
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                const SizedBox(height: 14),
+                for (final consejo in consejos)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.lightbulb_outline_rounded,
+                            color: _warningColor, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            consejo,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: Colors.grey.shade800,
+                              height: 1.35,
+                            ),
+                          ),
                         ),
-                      )
-                    : const Icon(Icons.camera_alt_rounded),
-                label: Text(practicada ? 'Repetir foto' : 'Abrir cámara'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                      ],
+                    ),
                   ),
-                  elevation: 0,
+                const SizedBox(height: 8),
+                Text(
+                  'Es solo práctica: la foto no se guarda ni se envía.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey.shade600,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  key: _keyBotonCamara,
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _abriendoCamara ? null : _abrirCamara,
+                    icon: _abriendoCamara
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.camera_alt_rounded),
+                    label: Text(practicada ? 'Repetir foto' : 'Abrir cámara'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
+  [FIN DESACTIVADO] */
 
   // Etapa 3: huella, permisos y GPS
   Widget _buildEtapaVerificaciones() {
@@ -1343,10 +1819,11 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Antes de abrir la cámara, la app comprueba que seas tú y que '
-          'estés en el aula:',
-          style: TextStyle(fontSize: 14, color: _darkColor, height: 1.4),
+        Text(
+          _modoSalida
+              ? 'Marcando salida. Se verifica igual que en la entrada:'
+              : 'Marcando entrada. Antes de la cámara se verifica:',
+          style: const TextStyle(fontSize: 14, color: _darkColor, height: 1.4),
         ),
         const SizedBox(height: 12),
         _buildFilaVerificacion(
@@ -1375,7 +1852,7 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
             children: [
               if (_estadoGps == EstadoVerificacion.fallo)
                 OutlinedButton.icon(
-                  onPressed: _activarGps,
+                  onPressed: Geolocator.openLocationSettings,
                   icon: const Icon(Icons.settings_rounded, size: 18),
                   label: const Text('Activar GPS'),
                 ),
@@ -1602,11 +2079,161 @@ class _GuiaPracticaScreenState extends State<GuiaPracticaScreen>
                 elevation: 0,
               ),
               child: Text(
-                // [ANTERIOR] _esUltima ? 'Ir a mi horario' : 'Siguiente',
+                // Primer ingreso: va al Home. Desde Home o Perfil: vuelve.
                 _esUltima
-                    ? (Navigator.canPop(context) ? 'Terminar' : 'Ir a mi horario')
-                    : 'Siguiente',
+                    ? (Navigator.canPop(context)
+                        ? 'Terminar'
+                        : 'Ir a mi horario')
+                    // En la verificacion el boton (re)abre la camara
+                    : (_etapa == EtapaGuia.verificaciones
+                        ? 'Abrir cámara'
+                        : 'Siguiente'),
                 style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Dedo animado que indica donde tocar
+// ─────────────────────────────────────────────────────────────
+// La punta del dedo queda arriba al centro del widget (ancho 120)
+class _ManoIndicadora extends StatefulWidget {
+  final String texto;
+
+  const _ManoIndicadora({required this.texto});
+
+  @override
+  State<_ManoIndicadora> createState() => _ManoIndicadoraState();
+}
+
+// Mano blanca con sombra que "presiona" y una onda de toque en la punta
+// del dedo. Cada ciclo: la mano baja (toque), sale la onda y la mano sube.
+class _ManoIndicadoraState extends State<_ManoIndicadora>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  static const double _ancho = 120;
+  // Punta del dedo dentro del widget (arriba al centro)
+  static const double _puntaY = 8;
+  static const double _tamanoMano = 46;
+  static const Color _azul = Color(0xFF4A6CF7);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _ancho,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: _ancho,
+            height: _tamanoMano + 10,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final t = _controller.value;
+
+                // La mano baja durante el primer 20% del ciclo y vuelve
+                final presion = t < 0.2
+                    ? Curves.easeOut.transform(t / 0.2)
+                    : t < 0.45
+                        ? 1 - Curves.easeIn.transform((t - 0.2) / 0.25)
+                        : 0.0;
+
+                // La onda sale cuando la mano toca y se desvanece
+                final onda = t < 0.15 ? 0.0 : ((t - 0.15) / 0.85);
+                final tamanoOnda = 12 + 42 * Curves.easeOut.transform(onda);
+                final opacidadOnda = (1 - onda) * 0.55;
+
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Onda de toque centrada en la punta del dedo
+                    Positioned(
+                      left: _ancho / 2 - tamanoOnda / 2,
+                      top: _puntaY - tamanoOnda / 2,
+                      child: Container(
+                        width: tamanoOnda,
+                        height: tamanoOnda,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _azul.withValues(alpha: opacidadOnda * 0.5),
+                          border: Border.all(
+                            color: _azul.withValues(alpha: opacidadOnda),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Mano: el indice de pan_tool_alt esta un poco a la
+                    // izquierda del centro del icono
+                    Positioned(
+                      left: _ancho / 2 - _tamanoMano * 0.42,
+                      top: _puntaY - _tamanoMano * 0.06 + presion * 4,
+                      child: Transform.scale(
+                        scale: 1 - presion * 0.08,
+                        child: const Icon(
+                          Icons.pan_tool_alt_rounded,
+                          size: _tamanoMano,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Color(0x66000000),
+                              blurRadius: 10,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 2),
+          // Etiqueta tipo "pildora"
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: _azul,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: _azul.withValues(alpha: 0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Text(
+              widget.texto,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11.5,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                height: 1.2,
               ),
             ),
           ),
