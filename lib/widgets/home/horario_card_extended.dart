@@ -52,6 +52,8 @@ class HorarioCardExtended extends StatefulWidget {
   final GlobalKey? keyEstado;
   final GlobalKey? keyBotones;
   final GlobalKey? keySalida;
+  // Boton "Confirmar" del dialogo de salida (la guia dibuja un dedo encima)
+  final GlobalKey? keyConfirmarSalida;
 
   const HorarioCardExtended({
     super.key,
@@ -63,6 +65,7 @@ class HorarioCardExtended extends StatefulWidget {
     this.keyEstado,
     this.keyBotones,
     this.keySalida,
+    this.keyConfirmarSalida,
   });
 
   @override
@@ -1774,6 +1777,7 @@ class _HorarioCardExtendedState extends State<HorarioCardExtended>
             isDestructiveAction: minutosDiferencia > 15,
             child: Text(
               'Confirmar',
+              key: widget.keyConfirmarSalida,
               style: TextStyle(
                 color:
                     minutosDiferencia > 15 ? _AppColors.red : _AppColors.blue,
