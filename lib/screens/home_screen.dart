@@ -27,6 +27,7 @@ import '../widgets/common/loading_dialog.dart';
 import '../utils/gestos.dart';
 import 'login_screen.dart';
 import 'historial_screen.dart';
+import 'horario_semanal_screen.dart';
 import 'perfil_screen.dart';
 import 'registro_facial_screen.dart';
 
@@ -968,6 +969,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onHistorial: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const HistorialScreen()),
+        ),
+        onHorarioSemanal: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const HorarioSemanalScreen()),
         ),
         onPerfil: () => Navigator.push(
           context,

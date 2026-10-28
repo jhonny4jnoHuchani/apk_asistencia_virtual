@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onRegistroFacial;
   final VoidCallback onHistorial;
+  final VoidCallback onHorarioSemanal;
   final VoidCallback onPerfil;
   final VoidCallback onLogout;
   final VoidCallback? onHelp;
@@ -12,6 +13,7 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.onRegistroFacial,
     required this.onHistorial,
+    required this.onHorarioSemanal,
     required this.onPerfil,
     required this.onLogout,
     this.onHelp,
@@ -146,6 +148,16 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
         onPressed: onHistorial,
         tooltip: 'Historial',
         color: _primaryPurple,
+        showBadge: false,
+      ),
+      const SizedBox(width: 2),
+
+      // Horario semanal
+      _buildActionButton(
+        icon: Icons.calendar_month_rounded,
+        onPressed: onHorarioSemanal,
+        tooltip: 'Horario semanal',
+        color: _primaryBlue,
         showBadge: false,
       ),
       const SizedBox(width: 2),

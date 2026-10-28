@@ -37,6 +37,8 @@ class ApiConfig {
   // ENDPOINTS DE HORARIOS
   // ============================================
   static const String horariosHoy = '/horarios/hoy';
+  // Horario de toda la semana del docente autenticado (GET, sin parametros)
+  static const String horariosSemanal = '/horarios/semanal';
 
   // ============================================
   // ENDPOINTS DE MARCADOS
