@@ -32,12 +32,24 @@ class HorarioProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
 
-      // Programar notificaciones locales para los horarios del día
-      _notificationService.programarNotificacionesHorarios(_horarios);
+      // Avisos semanales que llegan aunque no se abra la app
+      _programarAvisosSemana();
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  // Pide el horario semanal y programa los avisos de toda la semana.
+  // Si falla (sin internet), se mantienen los avisos que ya estaban.
+  Future<void> _programarAvisosSemana() async {
+    try {
+      final semana = await _horarioService.getHorariosSemanal();
+      await _notificationService.programarNotificacionesSemana(
+          semana, _horarios);
+    } catch (e) {
+      print('[AVISOS] No se pudo programar la semana: $e');
     }
   }
 

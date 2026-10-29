@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/horario.dart';
+import '../models/clase_semanal.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -141,126 +142,171 @@ class NotificationService {
     }
   }
 
-  /// Programa las notificaciones de entrada y salida para los horarios del día
-  Future<void> programarNotificacionesHorarios(List<Horario> horarios) async {
+  // Avisos semanales que se repiten solos: Android los dispara aunque la app
+  // este cerrada y los reprograma despues de reiniciar el celular.
+  // Los IDs semanales empiezan en 100000 para no chocar con el aviso de
+  // prueba (mostrarNotificacionInmediata).
+  static const int _baseIdSemanal = 100000;
+
+  /// Programa los avisos de toda la semana y ajusta los de hoy segun lo que
+  /// ya se marco (si ya marco la salida, el aviso de hoy no llega).
+  Future<void> programarNotificacionesSemana(
+    List<ClaseSemanal> clases,
+    List<Horario> horariosHoy,
+  ) async {
     await init();
-    final ahora = DateTime.now();
 
-    for (final horario in horarios) {
-      // --- 1. RECORDATORIO DE ENTRADA ---
-      // Se programa si el docente aún no marcó entrada
-      if (!horario.yaMarcoEntrada && horario.horaInicio.isNotEmpty) {
-        try {
-          final inicioParts = horario.horaInicio.split(':');
-          if (inicioParts.length >= 2) {
-            final hora = int.parse(inicioParts[0]);
-            final minuto = int.parse(inicioParts[1]);
+    // Cancelar los avisos semanales anteriores (por si cambio el horario)
+    try {
+      final pendientes =
+          await _notificationsPlugin.pendingNotificationRequests();
+      for (final p in pendientes) {
+        if (p.id >= _baseIdSemanal) {
+          await _notificationsPlugin.cancel(id: p.id);
+        }
+      }
+    } catch (e) {
+      debugPrint('[NotificationService] Error cancelando semanales: $e');
+    }
 
-            final inicioClase = DateTime(
-              ahora.year,
-              ahora.month,
-              ahora.day,
-              hora,
-              minuto,
-            );
+    final hoy = DateTime.now().weekday;
 
-            // Ventana de entrada: se habilita 30 minutos antes
-            final momentoHabilitado =
-                inicioClase.subtract(const Duration(minutes: 30));
+    for (final clase in clases) {
+      if (!clase.estaActivo) continue;
+      final dia = _numeroDia(clase.diaSemana);
+      final inicio = _parseHora(clase.horaInicio);
+      final fin = _parseHora(clase.horaFin);
+      if (dia == null || inicio == null) continue;
 
-            if (momentoHabilitado.isAfter(ahora)) {
-              await _programarAlarma(
-                id: (horario.id * 10) + 1,
-                fechaHora: momentoHabilitado,
-                titulo: '🔔 ¡Marcado Habilitado!',
-                cuerpo:
-                    'Ya puedes registrar tu entrada para ${horario.materia} (${horario.paralelo}).',
-                payload: 'entrada_${horario.id}',
-              );
-            }
+      // Horario de hoy que corresponde a esta clase (si es hoy)
+      Horario? deHoy;
+      if (dia == hoy) {
+        for (final h in horariosHoy) {
+          if (_mismaHora(h.horaInicio, clase.horaInicio) &&
+              _mismaHora(h.horaFin, clase.horaFin)) {
+            deHoy = h;
+            break;
           }
-        } catch (e) {
-          debugPrint('[NotificationService] Error calculando entrada: $e');
         }
       }
 
-      // --- 2. RECORDATORIO DE SALIDA ---
-      // Se programa para avisar cuando termina la clase (o 5 min antes)
-      if (horario.horaFin.isNotEmpty && !horario.yaMarcoSalida) {
-        try {
-          final finParts = horario.horaFin.split(':');
-          if (finParts.length >= 2) {
-            final hora = int.parse(finParts[0]);
-            final minuto = int.parse(finParts[1]);
+      // --- ENTRADA: 30 minutos antes del inicio (cuando se habilita) ---
+      await _programarSemanal(
+        id: _baseIdSemanal + (clase.id * 10) + 1,
+        dia: dia,
+        hora: inicio,
+        antes: const Duration(minutes: 30),
+        saltarHoy: deHoy?.yaMarcoEntrada ?? false,
+        titulo: '🔔 ¡Marcado Habilitado!',
+        cuerpo:
+            'Ya puedes registrar tu entrada para ${clase.materia} (${clase.paralelo}).',
+        payload: 'entrada_${clase.id}',
+      );
 
-            final finClase = DateTime(
-              ahora.year,
-              ahora.month,
-              ahora.day,
-              hora,
-              minuto,
-            );
-
-            // Avisar 5 minutos antes del final de la clase
-            final momentoSalida = finClase.subtract(const Duration(minutes: 5));
-
-            if (momentoSalida.isAfter(ahora)) {
-              await _programarAlarma(
-                id: (horario.id * 10) + 2,
-                fechaHora: momentoSalida,
-                titulo: '⏰ Fin de Clase Próximo',
-                cuerpo:
-                    'La clase de ${horario.materia} está por concluir. Recuerda marcar tu salida.',
-                payload: 'salida_${horario.id}',
-              );
-            }
-          }
-        } catch (e) {
-          debugPrint('[NotificationService] Error calculando salida: $e');
-        }
+      // --- SALIDA: 5 minutos antes del fin ---
+      if (fin != null) {
+        await _programarSemanal(
+          id: _baseIdSemanal + (clase.id * 10) + 2,
+          dia: dia,
+          hora: fin,
+          antes: const Duration(minutes: 5),
+          saltarHoy: deHoy?.yaMarcoSalida ?? false,
+          titulo: '⏰ Fin de Clase Próximo',
+          cuerpo:
+              'La clase de ${clase.materia} está por concluir. Recuerda marcar tu salida.',
+          payload: 'salida_${clase.id}',
+        );
       }
     }
   }
 
-  Future<void> _programarAlarma({
+  /// Programa un aviso que se repite cada semana el mismo dia y hora.
+  /// Si [saltarHoy] es true, la primera vez sera la proxima semana.
+  Future<void> _programarSemanal({
     required int id,
-    required DateTime fechaHora,
+    required int dia,
+    required List<int> hora,
+    required Duration antes,
+    required bool saltarHoy,
     required String titulo,
     required String cuerpo,
     String? payload,
   }) async {
     try {
-      final tzDateTime = tz.TZDateTime.from(fechaHora, tz.local);
+      final ahora = tz.TZDateTime.now(tz.local);
+      final diasHasta = (dia - ahora.weekday + 7) % 7;
+      final fechaClase = ahora.add(Duration(days: diasHasta));
+      var clase = tz.TZDateTime(tz.local, fechaClase.year, fechaClase.month,
+          fechaClase.day, hora[0], hora[1]);
+
+      if (saltarHoy && diasHasta == 0) {
+        clase = clase.add(const Duration(days: 7));
+      }
+      var aviso = clase.subtract(antes);
+      while (!aviso.isAfter(ahora)) {
+        aviso = aviso.add(const Duration(days: 7));
+      }
+
+      final androidPlugin =
+          _notificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      final puedeExacta =
+          await androidPlugin?.canScheduleExactNotifications() ?? true;
 
       await _notificationsPlugin.zonedSchedule(
         id: id,
         title: titulo,
         body: cuerpo,
-        scheduledDate: tzDateTime,
+        scheduledDate: aviso,
         notificationDetails: _notificationDetails(),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: puedeExacta
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        // Repetir cada semana el mismo dia y hora
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         payload: payload,
       );
 
       debugPrint(
-          '[NotificationService] Notificación programada ID $id a las $fechaHora: "$titulo"');
+          '[NotificationService] Semanal ID $id desde $aviso: "$titulo"');
     } catch (e) {
-      debugPrint('[NotificationService] Error en zonedSchedule: $e');
+      debugPrint('[NotificationService] Error en aviso semanal: $e');
     }
   }
 
-  /// Cancela la notificación de entrada de un horario cuando ya fue marcado
-  Future<void> cancelarNotificacionEntrada(int horarioId) async {
-    try {
-      await _notificationsPlugin.cancel(id: (horarioId * 10) + 1);
-    } catch (_) {}
+  // "lunes" / "MIÉRCOLES" / "sabado" -> 1..7 (DateTime.monday = 1)
+  static int? _numeroDia(String dia) {
+    final d = dia
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e');
+    const dias = {
+      'lunes': DateTime.monday,
+      'martes': DateTime.tuesday,
+      'miercoles': DateTime.wednesday,
+      'jueves': DateTime.thursday,
+      'viernes': DateTime.friday,
+      'sabado': DateTime.saturday,
+      'domingo': DateTime.sunday,
+    };
+    return dias[d];
   }
 
-  /// Cancela la notificación de salida de un horario cuando ya fue marcado
-  Future<void> cancelarNotificacionSalida(int horarioId) async {
-    try {
-      await _notificationsPlugin.cancel(id: (horarioId * 10) + 2);
-    } catch (_) {}
+  // "08:00" o "08:00:00" -> [8, 0]
+  static List<int>? _parseHora(String hora) {
+    final partes = hora.split(':');
+    if (partes.length < 2) return null;
+    final h = int.tryParse(partes[0].trim());
+    final m = int.tryParse(partes[1].trim());
+    if (h == null || m == null) return null;
+    return [h, m];
+  }
+
+  static bool _mismaHora(String a, String b) {
+    final ha = _parseHora(a);
+    final hb = _parseHora(b);
+    return ha != null && hb != null && ha[0] == hb[0] && ha[1] == hb[1];
   }
 
   /// Cancela todas las notificaciones pendientes
