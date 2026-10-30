@@ -6,9 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../providers/auth_provider.dart';
 import 'cambio_password_screen.dart';
-import 'home_screen.dart';
 import 'registro_facial_screen.dart';
 import 'forgot_password_screen.dart';
+import 'guia_practica_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -267,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  void _navigateToNextScreen() {
+  Future<void> _navigateToNextScreen() async {
     final authProvider = context.read<AuthProvider>();
 
     if (authProvider.necesitaCambiarPassword) {
@@ -281,9 +281,12 @@ class _LoginScreenState extends State<LoginScreen>
         MaterialPageRoute(builder: (_) => const RegistroFacialScreen()),
       );
     } else {
+      // La primera vez de cada usuario se muestra la guia de uso
+      final destino = await pantallaTrasLogin(authProvider.user?.id);
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => destino),
       );
     }
   }

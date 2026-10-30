@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
 
@@ -10,7 +9,6 @@ import 'providers/auth_provider.dart';
 import 'providers/horario_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/cambio_password_screen.dart';
-import 'screens/home_screen.dart';
 import 'screens/registro_facial_screen.dart';
 import 'screens/guia_practica_screen.dart';
 import 'screens/forgot_password_screen.dart';
@@ -302,14 +300,9 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final yaVioTutorial = prefs.getBool('ya_vio_tutorial') ?? false;
-
-    if (!yaVioTutorial) {
-      _irA(const GuiaPracticaScreen());
-    } else {
-      _irA(const HomeScreen());
-    }
+    final destino = await pantallaTrasLogin(authProvider.user?.id);
+    if (!mounted) return;
+    _irA(destino);
   }
 
   void _irA(Widget pantalla) {

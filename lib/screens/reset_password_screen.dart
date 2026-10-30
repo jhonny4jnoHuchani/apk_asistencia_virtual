@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
-import 'home_screen.dart';
+import 'guia_practica_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String token;
@@ -622,13 +622,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
+              // Al terminar el registro: la guia (primera vez) o el Home
+              onPressed: () async {
+                final userId = context.read<AuthProvider>().user?.id;
+                final Widget destino = widget.fromRegistration
+                    ? await pantallaTrasLogin(userId)
+                    : const LoginScreen();
+                if (!context.mounted) return;
                 Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => widget.fromRegistration
-                            ? const HomeScreen()
-                            : const LoginScreen()));
+                    context, MaterialPageRoute(builder: (_) => destino));
               },
               style: ElevatedButton.styleFrom(
                   backgroundColor: _primaryColor,

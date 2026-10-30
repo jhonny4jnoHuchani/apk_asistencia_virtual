@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'registro_facial_screen.dart';
-import 'home_screen.dart';
+import 'guia_practica_screen.dart';
 
 class CambioPasswordScreen extends StatefulWidget {
   const CambioPasswordScreen({super.key});
@@ -78,15 +78,16 @@ class _CambioPasswordScreenState extends State<CambioPasswordScreen> {
     }
   }
 
-  void _navigateToNextScreen() {
+  Future<void> _navigateToNextScreen() async {
     final authProvider = context.read<AuthProvider>();
+    // Sin registro facial pendiente: la guia (primera vez) o el Home
+    final Widget destino = authProvider.necesitaRegistroFacial
+        ? const RegistroFacialScreen()
+        : await pantallaTrasLogin(authProvider.user?.id);
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (_) => authProvider.necesitaRegistroFacial
-            ? const RegistroFacialScreen()
-            : const HomeScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => destino),
     );
   }
 
