@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'guia_rostro_animada.dart';
 
 class CameraMarcadoScreen extends StatefulWidget {
   final CameraController cameraController;
@@ -351,6 +352,15 @@ class _CameraMarcadoScreenState extends State<CameraMarcadoScreen>
                           color: _getEtapaColor().withOpacity(0.55),
                           width: 1.2))),
               _buildGuideLines(w, h),
+              // Silueta del rostro: quieta en la frontal, animada en el gesto
+              Center(
+                  child: GuiaRostroAnimada(
+                      gesto: widget.etapaFoto == 'gesto'
+                          ? widget.gestoSolicitado
+                          : null,
+                      ancho: w * 0.9,
+                      color: Colors.white,
+                      espejo: _isFrontCamera)),
               _buildCorner(Alignment.topLeft),
               _buildCorner(Alignment.topRight),
               _buildCorner(Alignment.bottomLeft),
